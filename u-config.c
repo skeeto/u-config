@@ -515,6 +515,7 @@ static Str *fieldbyname(Pkg *p, Str name)
 
 typedef struct {
     Size mask;
+    Size count;
     Pkg *head, *tail;
     Pkg **slots;
 } Pkgs;
@@ -523,7 +524,7 @@ static Pkgs newpackages(Arena *a, int exp)
 {
     Size len = (Size)1 << exp;
     Pkgs t = {
-        len-1, 0, 0, zallocn(a, SIZEOF(*t.slots), len)
+        len-1, 0, 0, 0, zallocn(a, SIZEOF(*t.slots), len)
     };
     return t;
 }
@@ -540,6 +541,8 @@ static Pkg *locate(Arena *a, Pkgs *t, Str realname)
         }
         last = &p->next;
     }
+
+    t->count++;
     Pkg *p = zalloc(a, SIZEOF(*p));
     p->name = realname;
     *last = p;
@@ -1575,6 +1578,13 @@ static void appmain(Config conf)
         process(a, &proc, args[i], priv);
     }
     endprocessor(&proc, &err);
+
+    if (!pkgs.count) {
+        outstr(&err, S("pkg-config: "));
+        outstr(&err, S("requires at least one package name\n"));
+        flush(&err);
+        os_fail();
+    }
 
     if (modversion) {
         for (Pkg *p = pkgs.head; p; p = p->list) {
