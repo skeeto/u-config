@@ -6,6 +6,11 @@ pkg-config.exe: win32_main.c u-config.c
 	      -s -nostdlib -Wl,--gc-sections -o $@ \
 	      win32_main.c -lkernel32 -lshell32
 
+# Configure using the system's pkg-config search path
+pkg-config: generic_main.c u-config.c
+	$(CC) -g3 -DDEBUG -fsanitize=undefined,address -o $@ generic_main.c \
+	  -DPKG_CONFIG_LIBDIR="\"$$(pkg-config --variable pc_path pkg-config)\""
+
 amalgamation: pkg-config.c
 pkg-config.c: u-config.c win32_main.c
 	cat u-config.c win32_main.c | sed '/^#include "/d' >$@
