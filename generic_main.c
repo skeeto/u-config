@@ -45,14 +45,14 @@ static Arena newarena_(void)
     // 32/64-bit : allocate 256 MiB
     int exp = 7 * SIZEOF(int);
     Size cap = (Size)1 << exp;
-    #if DEBUG
+    #ifdef DEBUG
     cap >>= 2;  // faster debugging
     #endif
 
     Arena arena = {0};
     arena.mem.s = malloc(cap);
     arena.mem.len = arena.mem.s ? cap : 0;
-    #if DEBUG
+    #ifdef DEBUG
     fillstr(arena.mem, 0xa5);
     #endif
     return arena;

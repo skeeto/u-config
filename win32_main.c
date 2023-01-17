@@ -41,7 +41,7 @@ static Arena newarena_(void)
     Size cap = 1<<28;
     arena.mem.s = VirtualAlloc(0, cap, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
     arena.mem.len = arena.mem.s ? cap : 0;
-    #if DEBUG
+    #ifdef DEBUG
     fillstr(arena.mem, 0xa5);
     #endif
     return arena;
