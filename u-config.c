@@ -1471,6 +1471,7 @@ static void appmain(Config conf)
     Str variable = {0, 0};
 
     *insert(a, &global, S("pc_path")) = conf.fixedpath;
+    *insert(a, &global, S("pc_sysrootdir")) = S("/");
     *insert(a, &global, S("pc_top_builddir")) = conf.top_builddir;
 
     Str *args = allocarray(a, SIZEOF(Str), conf.nargs);
