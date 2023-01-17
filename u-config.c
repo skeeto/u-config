@@ -1417,10 +1417,9 @@ static void msvcize(Out *out, Str arg)
 }
 
 typedef struct {
-    Arena *a;
+    Arena *arena;
     Out *out;
     Out *err;
-    Env *g;
     Filter filter;
     Bool msvc;
 } OutConfig;
@@ -1428,7 +1427,7 @@ typedef struct {
 // Process the field while writing it to the output.
 static void fieldout(OutConfig conf, Pkg *p, Str field)
 {
-    Arena a = *conf.a;  // no allocations escape this function
+    Arena a = *conf.arena;  // no allocations escape this function
     while (field.len) {
         DequoteResult r = dequote(&a, field);
         if (!r.ok) {
@@ -1448,7 +1447,7 @@ static void fieldout(OutConfig conf, Pkg *p, Str field)
             outbyte(conf.out, ' ');
         }
         field = r.tail;
-        a = *conf.a;  // free allocations
+        a = *conf.arena;  // free allocations
     }
 }
 
@@ -1608,14 +1607,26 @@ static void appmain(Config conf)
     }
 
     if (cflags) {
-        OutConfig cf = {a, &out, &err, &global, filterc, msvc};
+        OutConfig cf = {
+            .arena = a,
+            .out = &out,
+            .err = &err,
+            .filter = filterc,
+            .msvc = msvc,
+        };
         for (Pkg *p = pkgs.head; p; p = p->list) {
             fieldout(cf, p, p->cflags);
         }
     }
 
     if (libs) {
-        OutConfig cf = {a, &out, &err, &global, filterl, msvc};
+        OutConfig cf = {
+            .arena = a,
+            .out = &out,
+            .err = &err,
+            .filter = filterl,
+            .msvc = msvc,
+        };
         for (Pkg *p = pkgs.head; p; p = p->list) {
             fieldout(cf, p, p->libs);
             if (priv) {
