@@ -1505,9 +1505,11 @@ static void appmain(Config conf)
 
         } else if (equals(r.arg, S("-cflags"))) {
             cflags = 1;
+            filterc = Filter_ANY;
 
         } else if (equals(r.arg, S("-libs"))) {
             libs = 1;
+            filterl = Filter_ANY;
 
         } else if (equals(r.arg, S("-variable"))) {
             if (!r.value.s) {
@@ -1522,18 +1524,23 @@ static void appmain(Config conf)
             priv = 1;
 
         } else if (equals(r.arg, S("-libs-only-L"))) {
+            libs = 1;
             filterl = Filter_L;
 
         } else if (equals(r.arg, S("-libs-only-l"))) {
+            libs = 1;
             filterl = Filter_l;
 
         } else if (equals(r.arg, S("-libs-only-other"))) {
+            libs = 1;
             filterl = Filter_OTHERL;
 
         } else if (equals(r.arg, S("-cflags-only-I"))) {
+            cflags = 1;
             filterc = Filter_I;
 
         } else if (equals(r.arg, S("-cflags-only-other"))) {
+            cflags = 1;
             filterc = Filter_OTHERC;
 
         } else if (equals(r.arg, S("-msvc-syntax"))) {
