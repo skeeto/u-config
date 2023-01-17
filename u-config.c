@@ -7,7 +7,7 @@
 
 typedef int Size;
 typedef unsigned Usize;
-#define Size_MAX (int)((Usize)-1 >> 1)
+#define Size_MAX (Size)((Usize)-1 >> 1)
 
 typedef int Bool;
 typedef unsigned char Byte;
@@ -58,7 +58,7 @@ typedef struct {
 // Platform API
 
 // Application entry point. Returning from this function indicates the
-// application itself completed successfully. However, a os_write error
+// application itself completed successfully. However, an os_write error
 // may result in a non-zero exit.
 static void appmain(Config);
 
@@ -69,8 +69,8 @@ typedef struct {
     MapFileStatus status;
 } MapFileResult;
 
-// Load a file into memory, maybe using the arena. The path include a
-// null terminator since it may be passed directly to the OS.
+// Load a file into memory, maybe using the arena. The path must include
+// a null terminator since it may be passed directly to the OS interface.
 static MapFileResult os_mapfile(Arena *, Str path);
 
 // Write buffer to stdout (1) or stderr (2). The platform must detect
@@ -172,11 +172,6 @@ static Str fromptrs(Byte *beg, Byte *end)
     return s;
 }
 
-typedef struct {
-    Str head;
-    Str tail;
-} StrPair;
-
 // Copy src into dst returning the remaining portion of dst.
 static Str copy(Str dst, Str src)
 {
@@ -212,6 +207,7 @@ static Str cuthead(Str s, Size off)
 
 static Str takehead(Str s, Size len)
 {
+    ASSERT(len >= 0);
     ASSERT(len <= s.len);
     s.len = len;
     return s;
@@ -219,6 +215,7 @@ static Str takehead(Str s, Size len)
 
 static Str cuttail(Str s, Size len)
 {
+    ASSERT(len >= 0);
     ASSERT(len <= s.len);
     Str r = {s.s, s.len-len};
     return r;
@@ -233,6 +230,11 @@ static Bool startswith(Str s, Str prefix)
 {
     return s.len>=prefix.len && equals(takehead(s, prefix.len), prefix);
 }
+
+typedef struct {
+    Str head;
+    Str tail;
+} StrPair;
 
 static StrPair digits(Str s)
 {
@@ -292,7 +294,7 @@ typedef struct {
 } Out;
 
 // Buffered output for os_write().
-static Out newoutput(Arena *a, int fd, int len)
+static Out newoutput(Arena *a, int fd, Size len)
 {
     Str buf = newstr(a, len);
     Out out = {buf, buf, 0, fd};
@@ -330,6 +332,7 @@ static void flush(Out *out)
 static void outstr(Out *out, Str s)
 {
     if (!out->fd) {
+        // Output to a memory buffer, not a stream
         if (out->avail.len < s.len) {
             oom();
         }
@@ -337,6 +340,7 @@ static void outstr(Out *out, Str s)
         return;
     }
 
+    // Copy into the stream buffer
     while (s.len) {
         if (out->avail.len >= s.len) {
             out->avail = copy(out->avail, s);
@@ -433,7 +437,8 @@ static Str lookup(Env *global, Env *env, Str name)
     if (s) {
         return *s;
     }
-    return (Str){0, 0};
+    Str r = {0};
+    return r;
 }
 
 static Str dirname(Str path)

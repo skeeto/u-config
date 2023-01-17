@@ -104,9 +104,9 @@ int mainCRTStartup(void)
     conf.arena = newarena_();
     Arena *a = &conf.arena;
 
-	DWORD dummy;
+    DWORD dummy;
     HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
-	error_is_console = GetConsoleMode(err, &dummy);
+    error_is_console = GetConsoleMode(err, &dummy);
 
     // NOTE: consider using a custom, embedded command line parser in
     // order to avoid linking shell32.dll
@@ -151,7 +151,7 @@ static MapFileResult os_mapfile(Arena *a, Str path)
         CP_UTF8, 0, (char *)path.s, path.len, wpath, MAX_PATH
     );
     if (!wlen) {
-        MapFileResult r = {{0, 0}, MapFile_NOTFOUND};
+        MapFileResult r = {.status=MapFile_NOTFOUND};
         return r;
     }
 
@@ -165,28 +165,28 @@ static MapFileResult os_mapfile(Arena *a, Str path)
         0
     );
     if (h == INVALID_HANDLE_VALUE) {
-        MapFileResult r = {{0, 0}, MapFile_NOTFOUND};
+        MapFileResult r = {.status=MapFile_NOTFOUND};
         return r;
     }
 
     DWORD hi, lo = GetFileSize(h, &hi);
     if (hi || lo>Size_MAX) {
         CloseHandle(h);
-        MapFileResult r = {{0, 0}, MapFile_READERR};
+        MapFileResult r = {.status=MapFile_READERR};
         return r;
     }
 
     HANDLE *map = CreateFileMapping(h, 0, PAGE_READONLY, 0, lo, 0);
     CloseHandle(h);
     if (!map) {
-        MapFileResult r = {{0, 0}, MapFile_READERR};
+        MapFileResult r = {.status=MapFile_READERR};
         return r;
     }
 
     void *p = MapViewOfFile(map, FILE_MAP_READ, 0, 0, lo);
     CloseHandle(map);
     if (!p) {
-        MapFileResult r = {{0, 0}, MapFile_READERR};
+        MapFileResult r = {.status=MapFile_READERR};
         return r;
     }
 
@@ -219,7 +219,7 @@ static void os_write(int fd, Str s)
     }
 
     BOOL r = WriteFile(h, s.s, s.len, &n, 0);
-    if (!r || (Size)n != s.len) {
+    if (!r || (Size)n!=s.len) {
         os_fail();
     }
 }

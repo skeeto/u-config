@@ -1,7 +1,7 @@
 CROSS = x86_64-w64-mingw32-
 CC    = gcc
 
-pkg-config.exe: win32_main.c
+pkg-config.exe: win32_main.c u-config.c
 	$(CROSS)$(CC) -Os -fwhole-program -fno-asynchronous-unwind-tables \
 	      -s -nostdlib -Wl,--gc-sections -o $@ \
 	      win32_main.c -lkernel32 -lshell32
