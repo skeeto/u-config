@@ -1404,6 +1404,10 @@ static void msvcize(Out *out, Str arg)
     } else if (startswith(arg, S("-D"))) {
         outstr(out, S("/D"));
         outstr(out, cuthead(arg, 2));
+    } else if (equals(arg, S("-mwindows"))) {
+        outstr(out, S("/subsystem:windows"));
+    } else if (equals(arg, S("-mconsole"))) {
+        outstr(out, S("/subsystem:console"));
     } else {
         outstr(out, arg);
     }
