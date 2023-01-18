@@ -681,7 +681,7 @@ static ParseResult parsepackage(Arena *a, Str src)
                 if (p<e-1 && p[1]=='#') {
                     // Escaped #, include in token and skip over
                     p++;
-                    end = 0;
+                    end = p;
                     cleanup = 1;
                 }
                 Size r = escaped(fromptrs(p, e));
