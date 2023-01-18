@@ -1520,9 +1520,6 @@ static void appmain(Config conf)
             }
             variable = r.value;
 
-        } else if (equals(r.arg, S("-validate"))) {
-            return;  // fake it for scripts
-
         } else if (equals(r.arg, S("-static"))) {
             priv = 1;
 
