@@ -4,9 +4,8 @@ u-config ("*micro*-config") is a tiny implementation of [pkg-config][],
 primarily to support [w64devkit][] and Windows. It was born of frustration
 with pkg-config and [pkgconf][]. Key features:
 
-* It's a fraction of the size while retaining the core, user-level
-  features of pkg-config. There are fewer total lines of code in u-config
-  than in either of pkg-config's or pkgconf's *build scripts alone*.
+* A fraction of the size while retaining the core, user-level features of
+  pkg-config.
 
 * Windows as a first-class platform. Highly portable to any machine, even
   freestanding hosts.
@@ -134,20 +133,6 @@ The `DEBUG` macro enables assertions. Suggested debug build:
 For MSVC:
 
     $ cl /Z7 /W4 …platform arguments…
-
-### Specific complaints of the alternatives
-
-pkg-config is built on glib, a supremely-mediocre compatibility library,
-and it embeds a copy for targets that do not natively provide it. The
-Windows build of this embedded glib has been broken for some time now, and
-I was never able to produce a working build.
-
-pkgconf pushes the limits of GNU Autotools. Because of that, I was unable
-to build the most recent releases, even on Linux. I successfully built a
-slightly older release (1.8.0, July 2021), but pkgconf is riddled with
-memory corruption bugs such that Address Sanitizer kept killing it during
-my testing, even on simple inputs. (To its credit, at least pkg-config had
-zero ASan or UBSan findings during my testing.)
 
 
 [pkg-config]: https://www.freedesktop.org/wiki/Software/pkg-config/
