@@ -1,14 +1,16 @@
-CROSS = x86_64-w64-mingw32-
-CC    = gcc
+CROSS   = x86_64-w64-mingw32-
+CC      = gcc
+CFLAGS  = -Os
+LDFLAGS =
 
 pkg-config.exe: win32_main.c u-config.c
-	$(CROSS)$(CC) -Os -fwhole-program -fno-asynchronous-unwind-tables \
-	      -s -nostdlib -Wl,--gc-sections -o $@ \
-	      win32_main.c -lkernel32 -lshell32
+	$(CROSS)$(CC) -fwhole-program -fno-asynchronous-unwind-tables \
+	    -s -nostdlib -Wl,--gc-sections -o $@ $(CFLAGS) $(LDFLAGS) \
+	    win32_main.c -lkernel32 -lshell32
 
 # Configure using the system's pkg-config search path
 pkg-config: generic_main.c u-config.c
-	$(CC) -g3 -DDEBUG -fsanitize=undefined,address -o $@ generic_main.c \
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ generic_main.c \
 	  -DPKG_CONFIG_LIBDIR="\"$$(pkg-config --variable pc_path pkg-config)\""
 
 amalgamation: pkg-config.c
@@ -22,8 +24,7 @@ debug.exe: win32_main.c u-config.c
 
 debug: generic_main.c u-config.c
 	$(CC) -g3 -DDEBUG -Wall -Wextra -Wconversion -Wno-sign-conversion \
-	   -fsanitize=undefined -fsanitize-undefined-trap-on-error \
-	   -o $@ generic_main.c
+	   -fsanitize=address,undefined -o $@ generic_main.c
 
 clean:
-	rm -f pkg-config.exe pkg-config.c debug.exe debug
+	rm -f pkg-config.exe pkg-config pkg-config.c debug.exe debug
