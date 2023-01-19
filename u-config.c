@@ -1048,6 +1048,18 @@ typedef struct {
     Bool ok;
 } DequoteResult;
 
+static Bool shellmeta(Byte c)
+{
+    // NOTE: matches pkg-config's listing, which excludes "$()"
+    Str meta = S("\"!#%&'*<>?[\\]`{|}");
+    for (Size i = 0; i < meta.len; i++) {
+        if (meta.s[i] == c) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 // Process the next token. Return it and the unprocessed remainder.
 static DequoteResult dequote(Arena *a, Str s)
 {
@@ -1068,7 +1080,7 @@ static DequoteResult dequote(Arena *a, Str s)
         if (quote == '\'') {
             if (c == '\'') {
                 quote = 0;
-            } else if (c==' ' || c=='"' || c=='\\') {
+            } else if (c==' ' || shellmeta(c)) {
                 outbyte(&mem, '\\');
                 outbyte(&mem, c);
             } else {
@@ -1078,28 +1090,27 @@ static DequoteResult dequote(Arena *a, Str s)
         } else if (quote == '"') {
             if (escaped) {
                 escaped = 0;
-                if (c==' ' || c=='\'') {
-                    outstr(&mem, S("\\\\"));
-                } else if (c!='"' && c!='\\') {
+                if (c!='\\' && c!='"') {
                     outbyte(&mem, '\\');
+                    if (c==' ' || shellmeta(c)) {
+                        outbyte(&mem, '\\');
+                    }
                 }
                 outbyte(&mem, c);
             } else if (c == '\"') {
                 quote = 0;
-            } else if (c==' ' || c=='\'') {
+            } else if (c==' ' || shellmeta(c)) {
                 outbyte(&mem, '\\');
                 outbyte(&mem, c);
             } else {
-                if (c == '\\') {
-                    escaped = 1;
-                }
+                escaped = c == '\\';
                 outbyte(&mem, c);
             }
 
         } else if (c=='\'' || c=='"') {
             quote = c;
 
-        } else if (c=='\\' || c=='{' || c=='}' || c=='#') {
+        } else if (shellmeta(c)) {
             outbyte(&mem, '\\');
             outbyte(&mem, c);
 
