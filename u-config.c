@@ -1462,7 +1462,7 @@ static void fieldout(OutConfig conf, Pkg *p, Str field)
             outbyte(conf.out, ' ');
         }
         field = r.tail;
-        shredfree(&a);
+        shredfree(conf.arena);
     }
 }
 
