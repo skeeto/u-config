@@ -176,6 +176,8 @@ static void shredfree(Arena *a)
 
 static Str fromptrs(Byte *beg, Byte *end)
 {
+    ASSERT(beg);
+    ASSERT(end);
     ASSERT(end >= beg);
     Str s = {beg, (Size)(end - beg)};
     return s;
