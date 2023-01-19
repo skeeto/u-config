@@ -91,7 +91,6 @@ int main(int argc, char **argv)
     #ifdef DEBUG
     free(conf.arena.mem.s);  // look ma, no memory leaks
     #endif
-    fflush(stdout);
     return ferror(stdout);
 }
 
