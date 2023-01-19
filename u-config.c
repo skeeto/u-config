@@ -47,10 +47,9 @@ typedef struct {
     Arena arena;
     Str *args;
     Size nargs;
-    Str envpath;    // $PKG_CONFIG_PATH
-    Str fixedpath;
-    Str top_builddir;
-    Str libdir;
+    Str envpath;      // $PKG_CONFIG_PATH or empty
+    Str fixedpath;    // $PKG_CONFIG_LIBDIR or default
+    Str top_builddir; // $PKG_CONFIG_TOP_BUILD_DIR or default
     Byte delim;
 } Config;
 
