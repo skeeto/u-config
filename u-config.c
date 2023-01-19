@@ -1454,7 +1454,7 @@ typedef struct {
 
 static OutConfig newoutconf(Arena *a, Out *out, Out *err)
 {
-    OutConfig r = {a, out, err, 0, Filter_ANY, 0, ' '};
+    OutConfig r = {a, out, err, 0, Filter_ANY, 0, '\n'};
     return r;
 }
 
