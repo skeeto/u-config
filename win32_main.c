@@ -51,9 +51,7 @@ static Arena newarena_(void)
     #endif
     arena.mem.s = VirtualAlloc(0, cap, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
     arena.mem.len = arena.mem.s ? cap : 0;
-    #ifdef DEBUG
-    fillstr(arena.mem, 0xa5);
-    #endif
+    shredfree(&arena);
     return arena;
 }
 
@@ -127,7 +125,7 @@ int mainCRTStartup(void)
     HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
     error_is_console = GetConsoleMode(err, &dummy);
 
-    char **argv = allocarray(a, SIZEOF(**argv), CMDLINE_ARGV_MAX);
+    char **argv = allocarray(a, SIZEOF(*argv), CMDLINE_ARGV_MAX);
     conf.nargs = cmdline_to_argv8(GetCommandLineW(), argv) - 1;
     conf.args = allocarray(a, SIZEOF(Str), conf.nargs);
     for (Size i = 0; i < conf.nargs; i++) {

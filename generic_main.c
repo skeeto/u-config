@@ -53,9 +53,7 @@ static Arena newarena_(void)
     Arena arena = {0};
     arena.mem.s = malloc(cap);
     arena.mem.len = arena.mem.s ? cap : 0;
-    #ifdef DEBUG
-    fillstr(arena.mem, 0xa5);
-    #endif
+    shredfree(&arena);
     return arena;
 }
 

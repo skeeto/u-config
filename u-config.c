@@ -164,6 +164,16 @@ static Str maxstr(Arena *a)
     return newstr(a, len);
 }
 
+// Fill free space with garbage when debugging.
+static void shredfree(Arena *a)
+{
+    (void)a;
+    #ifdef DEBUG
+    Arena temp = *a;
+    fillstr(maxstr(&temp), 0xa5);
+    #endif
+}
+
 static Str fromptrs(Byte *beg, Byte *end)
 {
     ASSERT(end >= beg);
@@ -1101,6 +1111,7 @@ static DequoteResult dequote(Arena *a, Str s)
 
     if (quote) {
         *a = save;
+        shredfree(a);
         DequoteResult r = {0};
         return r;
     }
@@ -1429,8 +1440,8 @@ typedef struct {
 // Process the field while writing it to the output.
 static void fieldout(OutConfig conf, Pkg *p, Str field)
 {
-    Arena a = *conf.arena;  // no allocations escape this function
     while (field.len) {
+        Arena a = *conf.arena;  // no allocations escape this iteration
         DequoteResult r = dequote(&a, field);
         if (!r.ok) {
             outstr(conf.err, S("pkg-config: "));
@@ -1449,13 +1460,15 @@ static void fieldout(OutConfig conf, Pkg *p, Str field)
             outbyte(conf.out, ' ');
         }
         field = r.tail;
-        a = *conf.arena;  // free allocations
+        shredfree(&a);
     }
 }
 
 static void appmain(Config conf)
 {
     Arena *a = &conf.arena;
+    shredfree(a);
+
     Bool msvc = 0;
     Env global = {0};
     Filter filterc = Filter_ANY;
