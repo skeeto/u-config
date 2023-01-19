@@ -106,7 +106,7 @@ int mainCRTStartup(void)
     HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
     error_is_console = GetConsoleMode(err, &dummy);
 
-    char **argv = allocarray(a, SIZEOF(*argv), CMDLINE_ARGV_MAX);
+    char **argv = allocarray(a, SIZEOF(**argv), CMDLINE_ARGV_MAX);
     conf.nargs = cmdline_to_argv8(GetCommandLineW(), argv) - 1;
     conf.args = allocarray(a, SIZEOF(Str), conf.nargs);
     for (Size i = 0; i < conf.nargs; i++) {
