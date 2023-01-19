@@ -1271,8 +1271,8 @@ static void process(Arena *a, Processor *proc, Str arg, Bool priv)
 
     // NOTE: At >=128, GCC generates a __chkstk_ms on x86-64 because the
     // stack frame exceeds 4kB. A -mno-stack-arg-probe solves this, but
-    // simply limiting the recursion depth to 64, which is still plenty,
-    // this option can be avoided.
+    // limiting the recursion depth to 64, which is still plenty, avoids
+    // the issue entirely.
     ProcState stack[64];
     int top = 0;
     stack[0].arg = arg;
