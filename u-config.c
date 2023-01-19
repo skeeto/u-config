@@ -1087,8 +1087,8 @@ static DequoteResult dequote(Arena *a, Str s)
         } else if (c=='\'' || c=='"') {
             quote = c;
 
-        } else if (c=='\\') {
-            outbyte(&mem, c);
+        } else if (c=='\\' || c=='{' || c=='}' || c=='#') {
+            outbyte(&mem, '\\');
             outbyte(&mem, c);
 
         } else if (c==' ') {
