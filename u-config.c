@@ -1272,11 +1272,28 @@ static void pkgexpand(Arena *a, Out *err, Env *g, Pkg *p)
     }
 }
 
+// Wrap the string in quotes if it contains whitespace.
+static Str maybequote(Arena *a, Str s)
+{
+    for (Size i = 0; i < s.len; i++) {
+        if (whitespace(s.s[i])) {
+            Str r = newstr(a, s.len + 2);
+            Str t = copy(r, S("\""));
+                t = copy(t, s);
+                    copy(t, S("\""));
+            return r;
+        }
+    }
+    return s;
+}
+
 static void setprefix(Arena *a, Pkg *p)
 {
     Str parent = dirname(p->path);
     if (equals(S("pkgconfig"), basename(parent))) {
-        *insert(a, &p->env, S("prefix")) = dirname(dirname(parent));
+        Str prefix = dirname(dirname(parent));
+        prefix = maybequote(a, prefix);
+        *insert(a, &p->env, S("prefix")) = prefix;
     }
 }
 
