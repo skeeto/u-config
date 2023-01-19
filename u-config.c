@@ -1446,34 +1446,44 @@ typedef struct {
     Arena *arena;
     Out *out;
     Out *err;
+    Size count;
     Filter filter;
     Bool msvc;
+    Byte delim;
 } OutConfig;
 
+static OutConfig newoutconf(Arena *a, Out *out, Out *err)
+{
+    OutConfig r = {a, out, err, 0, Filter_ANY, 0, ' '};
+    return r;
+}
+
 // Process the field while writing it to the output.
-static void fieldout(OutConfig conf, Pkg *p, Str field)
+static void fieldout(OutConfig *conf, Pkg *p, Str field)
 {
     while (field.len) {
-        Arena a = *conf.arena;  // no allocations escape this iteration
+        Arena a = *conf->arena;  // no allocations escape this iteration
         DequoteResult r = dequote(&a, field);
         if (!r.ok) {
-            outstr(conf.err, S("pkg-config: "));
-            outstr(conf.err, S("unmatched quote in '"));
-            outstr(conf.err, p->realname);
-            outstr(conf.err, S("'\n"));
-            flush(conf.err);
+            outstr(conf->err, S("pkg-config: "));
+            outstr(conf->err, S("unmatched quote in '"));
+            outstr(conf->err, p->realname);
+            outstr(conf->err, S("'\n"));
+            flush(conf->err);
             os_fail();
         }
-        if (filterok(conf.filter, r.arg)) {
-            if (conf.msvc) {
-                msvcize(conf.out, r.arg);
-            } else {
-                outstr(conf.out, r.arg);
+        if (filterok(conf->filter, r.arg)) {
+            if (conf->count++) {
+                outbyte(conf->out, conf->delim);
             }
-            outbyte(conf.out, ' ');
+            if (conf->msvc) {
+                msvcize(conf->out, r.arg);
+            } else {
+                outstr(conf->out, r.arg);
+            }
         }
         field = r.tail;
-        shredfree(conf.arena);
+        shredfree(conf->arena);
     }
 }
 
@@ -1482,7 +1492,6 @@ static void appmain(Config conf)
     Arena *a = &conf.arena;
     shredfree(a);
 
-    Bool msvc = 0;
     Env global = {0};
     Filter filterc = Filter_ANY;
     Filter filterl = Filter_ANY;
@@ -1491,6 +1500,7 @@ static void appmain(Config conf)
     Out err = newoutput(a, 2, 1<<7);
     Search search = newsearch(a, conf.envpath, conf.fixedpath, conf.delim);
     Processor proc = newprocessor(&err, &search, &global, &pkgs);
+    OutConfig outconf = newoutconf(a, &out, &err);
 
     Bool priv = 0;
     Bool libs = 0;
@@ -1572,7 +1582,7 @@ static void appmain(Config conf)
             filterc = Filter_OTHERC;
 
         } else if (equals(r.arg, S("-msvc-syntax"))) {
-            msvc = 1;
+            outconf.msvc = 1;
 
         } else if (equals(r.arg, S("-define-variable"))) {
             if (!r.value.s) {
@@ -1633,30 +1643,18 @@ static void appmain(Config conf)
     }
 
     if (cflags) {
-        OutConfig cf = {
-            .arena = a,
-            .out = &out,
-            .err = &err,
-            .filter = filterc,
-            .msvc = msvc,
-        };
+        outconf.filter = filterc;
         for (Pkg *p = pkgs.head; p; p = p->list) {
-            fieldout(cf, p, p->cflags);
+            fieldout(&outconf, p, p->cflags);
         }
     }
 
     if (libs) {
-        OutConfig cf = {
-            .arena = a,
-            .out = &out,
-            .err = &err,
-            .filter = filterl,
-            .msvc = msvc,
-        };
+        outconf.filter = filterl;
         for (Pkg *p = pkgs.head; p; p = p->list) {
-            fieldout(cf, p, p->libs);
+            fieldout(&outconf, p, p->libs);
             if (priv) {
-                fieldout(cf, p, p->libsprivate);
+                fieldout(&outconf, p, p->libsprivate);
             }
         }
     }
