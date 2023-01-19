@@ -1,6 +1,8 @@
 // Win32 platform layer for u-config
 // This is free and unencumbered software released into the public domain.
 #include "u-config.c"
+#include "cmdline.c"
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 #ifndef PKG_CONFIG_PREFIX
@@ -10,27 +12,11 @@
 #ifdef _MSC_VER
   #define ENTRYPOINT
   #pragma comment(lib, "kernel32.lib")
-  #pragma comment(lib, "shell32.lib")
   #pragma comment(linker, "/subsystem:console")
   #pragma function(memset)
   void *memset(void *d, int c, size_t n) { __stosb(d, (BYTE)c, n); return d; }
 #elif __GNUC__
   #define ENTRYPOINT __attribute__((externally_visible))
-  // NOTE: Required for at least -O3. Placing it in its own section
-  // allows it to be ommitted via -Wl,--gc-sections when unused.
-  __attribute__((section(".text.memcpy")))
-  void *memcpy(void *d, const void *s, size_t n)
-  {
-      // NOTE: polyglot x86 and x64 inline assembly
-      void *r = d;
-      __asm volatile (
-          "rep movsb"
-          : "=D"(d), "=S"(s), "=c"(n)
-          : "0"(d), "1"(s), "2"(n)
-          : "memory"
-      );
-      return r;
-  }
 #endif
 
 static Bool error_is_console = 0;
@@ -99,6 +85,15 @@ static Str makepath_(Arena *a, Str base, Str lib, Str share)
     return s;
 }
 
+static Str fromcstr_(char *z)
+{
+    Str s = {(Byte *)z, 0};
+    if (s.s) {
+        for (; s.s[s.len]; s.len++) {}
+    }
+    return s;
+}
+
 ENTRYPOINT
 int mainCRTStartup(void)
 {
@@ -111,18 +106,11 @@ int mainCRTStartup(void)
     HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
     error_is_console = GetConsoleMode(err, &dummy);
 
-    // NOTE: consider using a custom, embedded command line parser in
-    // order to avoid linking shell32.dll
-    int argc;
-    WCHAR **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    argc--;
-    argv++;
-    conf.nargs = argc;
+    char **argv = allocarray(a, SIZEOF(*argv), CMDLINE_ARGV_MAX);
+    conf.nargs = cmdline_to_argv8(GetCommandLineW(), argv) - 1;
     conf.args = allocarray(a, SIZEOF(Str), conf.nargs);
-    for (int i = 0; i < argc; i++) {
-        Size len = 0;
-        for (; argv[i][len]; len++) {}
-        conf.args[i] = fromwide_(a, argv[i], len);
+    for (Size i = 0; i < conf.nargs; i++) {
+        conf.args[i] = fromcstr_(argv[i+1]);
     }
 
     conf.envpath = fromenv_(a, L"PKG_CONFIG_PATH");

@@ -56,7 +56,7 @@ probably interacting with tools that do not. It outputs arguments encoded
 in UTF-8 regardless of the system code page. Do not link a C runtime (CRT)
 in this configuration.
 
-    $ gcc -Os -nostdlib -o pkg-config win32_main.c -lkernel32 -lshell32
+    $ gcc -Os -fno-builtin -nostdlib -o pkg-config win32_main.c -lkernel32
 
 Or with MSVC (automatically omits a CRT):
 
