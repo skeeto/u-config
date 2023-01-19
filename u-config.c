@@ -6,8 +6,7 @@
 #define VERSION "0.0.1"
 
 typedef int Size;
-typedef unsigned Usize;
-#define Size_MAX (Size)((Usize)-1 >> 1)
+#define Size_MAX ((Size)((unsigned)-1>>1) - (ALIGN-1))
 
 typedef int Bool;
 typedef unsigned char Byte;
@@ -29,6 +28,7 @@ typedef unsigned char Byte;
 #  define ASSERT(c)
 #endif
 #define SIZEOF(x) (Size)(sizeof(x))
+#define ALIGN SIZEOF(void *)
 #define COUNTOF(a) (SIZEOF(a)/SIZEOF(a[0]))
 #define S(s) (Str){(Byte *)s, SIZEOF(s)-1}
 #define Z(s) (Str){(Byte *)s, SIZEOF(s)}
@@ -120,7 +120,7 @@ static void *alloc(Arena *a, Size size)
 {
     ASSERT(size >= 0);
     // Allow unsigned overflow giving negative size
-    size += -size & (Usize)(SIZEOF(void *) - 1);
+    size += -size & (ALIGN - 1);
     Size avail = a->mem.len - a->off;
     if (size<0 || avail<size) {
         oom();
