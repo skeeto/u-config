@@ -17,6 +17,27 @@
   void *memset(void *d, int c, size_t n) { __stosb(d, (BYTE)c, n); return d; }
 #elif __GNUC__
   #define ENTRYPOINT __attribute__((externally_visible))
+  // NOTE: These functions are required at higher GCC optimization
+  // levels. Placing them in their own section allows them to be
+  // ommitted via -Wl,--gc-sections when unused.
+  __attribute__((section(".text.memcpy")))
+  void *memcpy(void *d, const void *s, size_t n)
+  {
+      // NOTE: polyglot x86 and x64 inline assembly
+      void *r = d;
+      __asm volatile (
+          "rep movsb"
+          : "=D"(d), "=S"(s), "=c"(n)
+          : "0"(d), "1"(s), "2"(n)
+          : "memory"
+      );
+      return r;
+  }
+  __attribute__((section(".text.strlen")))
+  size_t strlen(const char *s)
+  {
+      return lstrlenA(s);
+  }
 #endif
 
 static Bool error_is_console = 0;
