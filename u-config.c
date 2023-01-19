@@ -1021,7 +1021,10 @@ static Pkg findpackage(Arena *a, Search *dirs, Out *err, Str realname)
         outstr(err, r.pkg.path);
         outstr(err, S("'\n"));
         flush(err);
+        #ifndef DEBUG
+        // Do not enforce during fuzzing
         os_fail();
+        #endif
     }
 
     return r.pkg;

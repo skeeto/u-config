@@ -39,6 +39,9 @@ static Arena newarena_(void)
 {
     Arena arena = {0};
     Size cap = 1<<28;
+    #if DEBUG
+    cap = 1<<21;
+    #endif
     arena.mem.s = VirtualAlloc(0, cap, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
     arena.mem.len = arena.mem.s ? cap : 0;
     #ifdef DEBUG

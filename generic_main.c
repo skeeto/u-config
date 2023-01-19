@@ -46,7 +46,8 @@ static Arena newarena_(void)
     int exp = 7 * SIZEOF(int);
     Size cap = (Size)1 << exp;
     #ifdef DEBUG
-    cap >>= 2;  // faster debugging
+    // Reduce for fuzzing and faster debugging
+    cap = (Size)1 << 21;
     #endif
 
     Arena arena = {0};
