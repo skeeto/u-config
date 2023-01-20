@@ -1478,11 +1478,50 @@ static void msvcize(Out *out, Str arg)
     }
 }
 
+typedef struct StrSetNode {
+    struct StrSetNode *next;
+    Str str;
+} StrSetNode;
+
+typedef struct {
+    Size mask;
+    StrSetNode **slots;
+} StrSet;
+
+static StrSet newstrset(Arena *a)
+{
+    Size count = (Size)1 << 6;
+    StrSet r = {
+        count - 1,
+        zallocn(a, SIZEOF(*r.slots), count),
+    };
+    return r;
+}
+
+// Try to insert the string into the set, returning true on success.
+static Bool insertstr(Arena *a, StrSet set, Str s)
+{
+    Size i = hash(s) & set.mask;
+    StrSetNode **last = set.slots + i;
+    for (StrSetNode *n = set.slots[i]; n; n = n->next) {
+        if (equals(s, n->str)) {
+            return 0;
+        }
+        last = &n->next;
+    }
+    StrSetNode *n = alloc(a, SIZEOF(*n));
+    n->next = 0;
+    n->str = s;
+    *last = n;
+    return 1;
+}
+
 typedef struct {
     Arena *arena;
     Out *out;
     Out *err;
     Size count;
+    StrSet seen;
     Filter filter;
     Bool msvc;
     Byte delim;
@@ -1490,16 +1529,18 @@ typedef struct {
 
 static OutConfig newoutconf(Arena *a, Out *out, Out *err)
 {
-    OutConfig r = {a, out, err, 0, Filter_ANY, 0, '\n'};
+    OutConfig r = {a, out, err, 0, newstrset(a), Filter_ANY, 0, '\n'};
     return r;
 }
 
 // Process the field while writing it to the output.
 static void fieldout(OutConfig *conf, Pkg *p, Str field)
 {
+    Arena *a = conf->arena;
+    Filter f = conf->filter;
     while (field.len) {
-        Arena a = *conf->arena;  // no allocations escape this iteration
-        DequoteResult r = dequote(&a, field);
+        Arena tentative = *a;
+        DequoteResult r = dequote(&tentative, field);
         if (!r.ok) {
             outstr(conf->err, S("pkg-config: "));
             outstr(conf->err, S("unmatched quote in '"));
@@ -1508,7 +1549,8 @@ static void fieldout(OutConfig *conf, Pkg *p, Str field)
             flush(conf->err);
             os_fail();
         }
-        if (filterok(conf->filter, r.arg)) {
+        if (filterok(f, r.arg) && insertstr(&tentative, conf->seen, r.arg)) {
+            *a = tentative;  // keep the allocations
             if (conf->count++) {
                 outbyte(conf->out, conf->delim);
             }
@@ -1519,7 +1561,6 @@ static void fieldout(OutConfig *conf, Pkg *p, Str field)
             }
         }
         field = r.tail;
-        shredfree(conf->arena);
     }
 }
 
