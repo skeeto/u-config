@@ -1515,7 +1515,7 @@ static void appmain(Config conf)
     Filter filterc = Filter_ANY;
     Filter filterl = Filter_ANY;
     Pkgs pkgs = newpackages(a, 8);
-    Out out = newoutput(a, 1, 1<<8);
+    Out out = newoutput(a, 1, 1<<12);
     Out err = newoutput(a, 2, 1<<7);
     Processor proc = newprocessor(&conf, &err, &global, &pkgs);
     OutConfig outconf = newoutconf(a, &out, &err);
