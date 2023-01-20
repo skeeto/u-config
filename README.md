@@ -125,6 +125,12 @@ Example, if just outside a sysroot which identifies the architecture:
 
     $ gcc -DPKG_CONFIG_PREFIX="\"/$(gcc -dumpmachine)\"" ...
 
+### x86-64 Linux configuration options
+
+Do not link the `linux_amd64_main.c` platform with libc. It compiles to a
+~20kB static x86-64 executable. It has just one configuration knob,
+`PKG_CONFIG_LIBDIR`, which works the same as the generic platform.
+
 ### Debugging
 
 The `DEBUG` macro enables assertions. Suggested debug build:
