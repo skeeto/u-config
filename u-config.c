@@ -361,10 +361,11 @@ static void outstr(Out *out, Str s)
             os_write(out->fd, s);
             s.len = 0;
         } else {
-            Str head = {s.s, out->avail.len};
+            Size len = out->avail.len;
+            Str head = takehead(s, len);
+            s = cuthead(s, len);
             out->avail = copy(out->avail, head);
             flush(out);
-            s = cuthead(s, head.len);
         }
     }
 }
