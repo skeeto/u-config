@@ -143,9 +143,9 @@ static MapFileResult os_mapfile(Arena *a, Str path)
     }
     Size size = (Size)stat[6];
 
-    long p = syscall6(SYS_mmap, 0, size, 1, 2, fd, 0);
+    unsigned long p = syscall6(SYS_mmap, 0, size, 1, 2, fd, 0);
     syscall1(SYS_close, fd);
-    if (p < 0) {
+    if (p > -4096UL) {
         MapFileResult r = {.status=MapFile_READERR};
         return r;
     }
@@ -166,8 +166,8 @@ static Str fromcstr_(char *z)
 static Arena newarena_(void)
 {
     Size size = 1 << 21;
-    long p = syscall6(SYS_mmap, 0, size, 3, 0x22, -1, 0);
-    if (p>-4096 && p<=0) {
+    unsigned long p = syscall6(SYS_mmap, 0, size, 3, 0x22, -1, 0);
+    if (p > -4096UL) {
         Arena r = {0};
         return r;
     }
