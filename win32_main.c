@@ -118,6 +118,7 @@ int mainCRTStartup(void)
 {
     Config conf = {0};
     conf.delim = ';';
+    conf.define_prefix = 1;
     conf.arena = newarena_();
     Arena *a = &conf.arena;
 

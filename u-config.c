@@ -50,6 +50,7 @@ typedef struct {
     Str envpath;      // $PKG_CONFIG_PATH or empty
     Str fixedpath;    // $PKG_CONFIG_LIBDIR or default
     Str top_builddir; // $PKG_CONFIG_TOP_BUILD_DIR or default
+    Bool define_prefix;
     Byte delim;
 } Config;
 
@@ -1233,7 +1234,7 @@ static Bool validcompare(VersionOp op, int result)
 
 typedef struct {
     Out *err;
-    Search *search;
+    Search search;
     Env *global;
     Pkgs *pkgs;
     Pkg *last;
@@ -1241,8 +1242,9 @@ typedef struct {
     Bool define_prefix;
 } Processor;
 
-static Processor newprocessor(Out *err, Search *search, Env *g, Pkgs *pkgs)
+static Processor newprocessor(Config *c, Out *err, Env *g, Pkgs *pkgs)
 {
+    Search search = newsearch(&c->arena, c->envpath, c->fixedpath, c->delim);
     Processor proc = {err, search, g, pkgs, 0, 0, 1};
     return proc;
 }
@@ -1308,7 +1310,7 @@ static void process(Arena *a, Processor *proc, Str arg, Bool priv)
     Out *err = proc->err;
     Pkgs *pkgs = proc->pkgs;
     Env *global = proc->global;
-    Search *search = proc->search;
+    Search *search = &proc->search;
 
     // NOTE: At >=128, GCC generates a __chkstk_ms on x86-64 because the
     // stack frame exceeds 4kB. A -mno-stack-arg-probe solves this, but
@@ -1515,8 +1517,7 @@ static void appmain(Config conf)
     Pkgs pkgs = newpackages(a, 8);
     Out out = newoutput(a, 1, 1<<8);
     Out err = newoutput(a, 2, 1<<7);
-    Search search = newsearch(a, conf.envpath, conf.fixedpath, conf.delim);
-    Processor proc = newprocessor(&err, &search, &global, &pkgs);
+    Processor proc = newprocessor(&conf, &err, &global, &pkgs);
     OutConfig outconf = newoutconf(a, &out, &err);
 
     Bool priv = 0;
@@ -1524,6 +1525,8 @@ static void appmain(Config conf)
     Bool cflags = 0;
     Bool modversion = 0;
     Str variable = {0, 0};
+
+    proc.define_prefix = conf.define_prefix;
 
     *insert(a, &global, S("pc_path")) = conf.fixedpath;
     *insert(a, &global, S("pc_sysrootdir")) = S("/");

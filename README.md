@@ -97,6 +97,9 @@ usually not useful.
   not used. If the environment variable is set at run time, it replaces
   this path.
 
+* `PKG_CONFIG_DEFINE_PREFIX`: Sets the default for `--define-prefix` /
+  `--dont-define-prefix`. Defaults to true on Windows, false otherwise.
+
 Examples:
 
     $ gcc -DPKG_CONFIG_PREFIX="\"$HOME/.local\"" ...

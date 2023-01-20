@@ -8,8 +8,14 @@
 
 #if _WIN32
 #  define PATHDELIM ";"
+#  ifndef PKG_CONFIG_DEFINE_PREFIX
+#    define PKG_CONFIG_DEFINE_PREFIX 1
+#  endif
 #else
 #  define PATHDELIM ":"
+#  ifndef PKG_CONFIG_DEFINE_PREFIX
+#    define PKG_CONFIG_DEFINE_PREFIX 0
+#  endif
 #endif
 
 #ifndef PKG_CONFIG_PREFIX
@@ -61,6 +67,7 @@ int main(int argc, char **argv)
 {
     Config conf = {0};
     conf.delim = PATHDELIM[0];
+    conf.define_prefix = PKG_CONFIG_DEFINE_PREFIX;
     conf.arena = newarena_();
 
     if (argc) {
