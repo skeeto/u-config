@@ -39,8 +39,8 @@ int main(void)
 
     Config conf = {
         .arena = {malloc(1<<16), 1<<16},
-        .args = (Str[]){S("--modversion"), S("afl")},
-        .nargs = 2,
+        .args = (Str[]){S("--modversion"), S("--cflags"), S("afl")},
+        .nargs = 3,
         .fixedpath = S("/usr/lib/pkgconfig"),
     };
 
