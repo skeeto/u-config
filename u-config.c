@@ -313,6 +313,12 @@ static Out newoutput(Arena *a, int fd, Size len)
     return out;
 }
 
+static Out newnullout(void)
+{
+    Out out = {.fd=-1};
+    return out;
+}
+
 // Output to a dynamically-grown arena buffer. The arena cannot be used
 // again until this buffer is finalized.
 static Out newmembuf(Arena *a)
@@ -343,7 +349,11 @@ static void flush(Out *out)
 
 static void outstr(Out *out, Str s)
 {
-    if (!out->fd) {
+    if (out->fd == -1) {
+        return;  // /dev/null
+    }
+
+    if (out->fd == 0) {
         // Output to a memory buffer, not a stream
         if (out->avail.len < s.len) {
             oom();
@@ -790,6 +800,7 @@ static void usage(Out *out)
 {
     static const char usage[] =
     "usage: pkg-config [OPTIONS...] [PACKAGES...]\n"
+    "  --exists\n"
     "  --cflags, --cflags-only-I, --cflags-only-other\n"
     "  --define-prefix, --dont-define-prefix\n"
     "  --define-variable=NAME=VALUE, --variable=NAME\n"
@@ -1627,6 +1638,10 @@ static void appmain(Config conf)
                 os_fail();
             }
             *insert(a, &global, c.head) = c.tail;
+
+        } else if (equals(r.arg, S("-exists"))) {
+            // The check already happens, just disable the messages
+            err = newnullout();
 
         } else {
             outstr(&err, S("pkg-config: "));
