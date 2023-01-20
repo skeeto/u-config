@@ -42,4 +42,5 @@ pkg-config.c: u-config.c cmdline.c win32_main.c
 clean:
 	rm -f pkg-config.exe pkg-config-debug.exe \
 	      pkg-config pkg-config-debug \
-	      pkg-config-linux-amd64 pkg-config-linux-amd64-debug
+	      pkg-config-linux-amd64 pkg-config-linux-amd64-debug \
+	      pkg-config.c
