@@ -141,11 +141,7 @@ int mainCRTStartup(void)
         Str share = S(PKG_CONFIG_PREFIX "/share/pkgconfig");
         conf.fixedpath = makepath_(a, base, lib, share);
     }
-
     conf.top_builddir  = fromenv_(a, L"PKG_CONFIG_TOP_BUILD_DIR");
-    if (!conf.top_builddir.s) {
-        conf.top_builddir = S("$(top_builddir)");
-    }
 
     appmain(conf);
     ExitProcess(0);

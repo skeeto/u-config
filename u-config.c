@@ -1527,6 +1527,9 @@ static void appmain(Config conf)
     Str variable = {0, 0};
 
     proc.define_prefix = conf.define_prefix;
+    if (!conf.top_builddir.s) {
+        conf.top_builddir = S("$(top_builddir)");
+    }
 
     *insert(a, &global, S("pc_path")) = conf.fixedpath;
     *insert(a, &global, S("pc_sysrootdir")) = S("/");

@@ -85,11 +85,7 @@ int main(int argc, char **argv)
     if (!conf.fixedpath.s) {
         conf.fixedpath = S(pkg_config_path);
     }
-
     conf.top_builddir  = fromcstr_(getenv("PKG_CONFIG_TOP_BUILD_DIR"));
-    if (!conf.top_builddir.s) {
-        conf.top_builddir = S("$(top_builddir)");
-    }
 
     appmain(conf);
 

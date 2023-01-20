@@ -193,7 +193,6 @@ int os_main(int argc, char **argv, char **envp)
     }
 
     conf.fixedpath = S(PKG_CONFIG_LIBDIR);
-    conf.top_builddir = S("$(top_builddir)");
 
     for (char **v = envp; *v; v++) {
         Cut c = cut(fromcstr_(*v), '=');
