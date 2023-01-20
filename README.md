@@ -35,7 +35,7 @@ summary:
 It still supports pkg-config standard run-time configuration variables:
 `PKG_CONFIG_PATH`, `PKG_CONFIG_LIBDIR`, `PKG_CONFIG_TOP_BUILD_DIR`. See
 the pkg-config documentation for details. It also closely follows
-pkg-config's idiosynratic argument parsing — positional arguments are
+pkg-config's idiosyncratic argument parsing — positional arguments are
 concatenated then retokenzied — and its undocumented `.pc` quote and
 backslash syntax.
 
@@ -51,7 +51,7 @@ limitations, no automatic self-configuration, etc.).
 
 However, one of core goals is to be a reliable, native pkg-config for
 Windows, so it gets a dedicated platform layer. This layer understands
-unicode paths and environment variables — though keep in mind that it's
+Unicode paths and environment variables — though keep in mind that it's
 probably interacting with tools that do not. It outputs arguments encoded
 in UTF-8 regardless of the system code page. Do not link a C runtime (CRT)
 in this configuration.
@@ -78,6 +78,8 @@ The `pkg-config` package is virtual and need not exist as an actual `.pc`
 file installed in the system. The `pkg-config` make target automatically
 grabs the search path from the system `pkg-config`, and so could then be a
 drop-in replacement for it.
+
+    $ make pkg-config   # grabs system's pkg-config search path
 
 ### Generic configuration options
 
