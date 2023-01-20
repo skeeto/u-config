@@ -1539,6 +1539,7 @@ static void appmain(Config conf)
 
     Bool libs = 0;
     Bool cflags = 0;
+    Bool silent = 1;
     Bool static_ = 0;
     Bool modversion = 0;
     Str variable = {0, 0};
@@ -1641,7 +1642,7 @@ static void appmain(Config conf)
 
         } else if (equals(r.arg, S("-exists"))) {
             // The check already happens, just disable the messages
-            err = newnullout();
+            silent = 1;
 
         } else {
             outstr(&err, S("pkg-config: "));
@@ -1651,6 +1652,10 @@ static void appmain(Config conf)
             flush(&err);
             os_fail();
         }
+    }
+
+    if (silent) {
+        err = newnullout();
     }
 
     for (Size i = 0; i < nargs; i++) {
