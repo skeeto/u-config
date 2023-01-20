@@ -7,8 +7,10 @@ with pkg-config and [pkgconf][]. Key features:
 * A fraction of the size while retaining the core, user-level features of
   pkg-config.
 
-* Windows as a first-class platform. Highly portable to any machine, even
-  freestanding hosts.
+* Windows as a first-class supported platform.
+
+* Highly portable to any machine. Can be built without libc, which is
+  handy for bootstrapping
 
 * Trivial, fast build. No messing around with GNU Autotools, or any build
   system for that matter.
@@ -25,11 +27,9 @@ summary:
 
 * Omits most `.pc` debugging features (`--print-…`)
 * No special handling of "uninstalled" packages, and no attendant knobs
-* No removal of repeated compiler arguments (at least not yet)
+* No removal of redundant compiler arguments (at least not yet)
 * Skips checks unimplemented by pkg-config (i.e. `Conflicts:`)
 * Omits clunky redundant features (`--exists`, `--errors-to-stdout`, etc.)
-* Skips esoteric features unnsupported by standard C (directory listings,
-  environment listings)
 * Less strict `.pc` syntax
 
 It still supports pkg-config standard run-time configuration variables:
@@ -74,8 +74,10 @@ double check your configuration, examine `pc_path`:
 
     $ ./pkg-config --variable pc_path pkg-config
 
-(The `pkg-config` package is virtual and need not exist as an actual `.pc`
-file installed in the system.)
+The `pkg-config` package is virtual and need not exist as an actual `.pc`
+file installed in the system. The `pkg-config` make target automatically
+grabs the search path from the system `pkg-config`, and so could then be a
+drop-in replacement for it.
 
 ### Generic configuration options
 
