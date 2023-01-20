@@ -119,10 +119,10 @@ static Str fillstr(Str s, Byte b)
 static void *alloc(Arena *a, Size size)
 {
     ASSERT(size >= 0);
-    // Allow unsigned overflow giving negative size
+    ASSERT(size <= Size_MAX);
     size += -size & (ALIGN - 1);
     Size avail = a->mem.len - a->off;
-    if (size<0 || avail<size) {
+    if (avail < size) {
         oom();
     }
     Byte *p = a->mem.s + a->off;
