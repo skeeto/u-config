@@ -482,6 +482,8 @@ static Str buildpath(Arena *a, Str dir, Str pc)
     return path;
 }
 
+typedef enum {Pkg_DIRECT=1<<0, Pkg_PUBLIC=1<<1} PkgFlags;
+
 typedef struct Pkg {
     struct Pkg *next;  // hash table slot list
     struct Pkg *list;  // total load order list
@@ -489,7 +491,7 @@ typedef struct Pkg {
     Str realname;
     Str contents;
     Env env;
-    Bool direct;
+    int flags;
 
     #define PKG_NFIELDS 10
     Str name;
@@ -1304,10 +1306,11 @@ static void setprefix(Arena *a, Pkg *p)
 typedef struct {
     Str arg;
     Pkg *last;
+    int flags;
     VersionOp op;
 } ProcState;
 
-static void process(Arena *a, Processor *proc, Str arg, Bool priv)
+static void process(Arena *a, Processor *proc, Str arg)
 {
     Out *err = proc->err;
     Pkgs *pkgs = proc->pkgs;
@@ -1322,6 +1325,7 @@ static void process(Arena *a, Processor *proc, Str arg, Bool priv)
     int top = 0;
     stack[0].arg = arg;
     stack[0].last = proc->last;
+    stack[0].flags = Pkg_DIRECT | Pkg_PUBLIC;
     stack[0].op = 0;
 
     while (top >= 0) {
@@ -1329,10 +1333,10 @@ static void process(Arena *a, Processor *proc, Str arg, Bool priv)
         StrPair pair = nexttoken(s->arg);
         Str tok = pair.head;
         if (!tok.len) {
-            top--;
             if (s->op) {
                 procfail(err, s->op, s->last);
             }
+            top--;
             continue;
         }
         stack[top].arg = pair.tail;
@@ -1371,7 +1375,7 @@ static void process(Arena *a, Processor *proc, Str arg, Bool priv)
             continue;
         }
 
-        Bool direct = top == 0;
+        int flags = s->flags;
         Pkg *pkg = s->last = locate(a, pkgs, pathtorealname(tok));
         if (!pkg->contents.s) {
             *pkg = findpackage(a, search, err, tok);
@@ -1387,18 +1391,18 @@ static void process(Arena *a, Processor *proc, Str arg, Bool priv)
                 flush(err);
                 os_fail();
             }
-            if (priv) {
-                top++;
-                stack[top].arg = pkg->requiresprivate;
-                stack[top].last = 0;
-                stack[top].op = 0;
-            }
+            top++;
+            stack[top].arg = pkg->requiresprivate;
+            stack[top].last = 0;
+            stack[top].op = 0;
+            stack[top].flags = 0;
             top++;
             stack[top].arg = pkg->requires;
             stack[top].last = 0;
             stack[top].op = 0;
+            stack[top].flags = (flags & ~Pkg_DIRECT) | Pkg_PUBLIC;
         }
-        pkg->direct |= direct;
+        pkg->flags |= flags;
     }
 
     proc->last = stack[0].last;
@@ -1522,9 +1526,9 @@ static void appmain(Config conf)
     Processor proc = newprocessor(&conf, &err, &global, &pkgs);
     OutConfig outconf = newoutconf(a, &out, &err);
 
-    Bool priv = 0;
     Bool libs = 0;
     Bool cflags = 0;
+    Bool static_ = 0;
     Bool modversion = 0;
     Str variable = {0, 0};
 
@@ -1584,7 +1588,7 @@ static void appmain(Config conf)
             variable = r.value;
 
         } else if (equals(r.arg, S("-static"))) {
-            priv = 1;
+            static_ = 1;
 
         } else if (equals(r.arg, S("-libs-only-L"))) {
             libs = 1;
@@ -1635,7 +1639,7 @@ static void appmain(Config conf)
     }
 
     for (Size i = 0; i < nargs; i++) {
-        process(a, &proc, args[i], priv);
+        process(a, &proc, args[i]);
     }
     endprocessor(&proc, &err);
 
@@ -1648,7 +1652,7 @@ static void appmain(Config conf)
 
     if (modversion) {
         for (Pkg *p = pkgs.head; p; p = p->list) {
-            if (p->direct) {
+            if (p->flags & Pkg_DIRECT) {
                 outstr(&out, p->version);
                 outstr(&out, S("\n"));
             }
@@ -1657,7 +1661,7 @@ static void appmain(Config conf)
 
     if (variable.s) {
         for (Pkg *p = pkgs.head; p; p = p->list) {
-            if (p->direct) {
+            if (p->flags & Pkg_DIRECT) {
                 Str value = lookup(&global, &p->env, variable);
                 if (value.s) {
                     expand(&out, &err, &global, p, value);
@@ -1677,9 +1681,11 @@ static void appmain(Config conf)
     if (libs) {
         outconf.filter = filterl;
         for (Pkg *p = pkgs.head; p; p = p->list) {
-            fieldout(&outconf, p, p->libs);
-            if (priv) {
+            if (static_) {
+                fieldout(&outconf, p, p->libs);
                 fieldout(&outconf, p, p->libsprivate);
+            } else if (p->flags & Pkg_PUBLIC) {
+                fieldout(&outconf, p, p->libs);
             }
         }
     }
