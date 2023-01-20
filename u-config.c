@@ -470,12 +470,13 @@ static Str basename(Str path)
 
 static Str buildpath(Arena *a, Str dir, Str pc)
 {
+    Str sep = S("/");
     Str suffix = Z(".pc");
-    Size pathlen = dir.len + 1 + pc.len + suffix.len;
+    Size pathlen = dir.len + sep.len + pc.len + suffix.len;
     Str path = {alloc(a, pathlen), pathlen};
     Str p = path;
     p = copy(p, dir);
-    p = copy(p, S("/"));
+    p = copy(p, sep);
     p = copy(p, pc);
         copy(p, suffix);
     return path;
