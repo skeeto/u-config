@@ -1685,6 +1685,18 @@ static void appmain(Config conf)
             // The check already happens, just disable the messages
             silent = 1;
 
+        } else if (equals(r.arg, S("-atleast-pkgconfig-version"))) {
+            if (!r.value.s) {
+                r.value = getargopt(&err, &opts, r.arg);
+            }
+            return;  // always succeeds
+
+        } else if (equals(r.arg, S("-print-errors"))) {
+            // Ignore
+
+        } else if (equals(r.arg, S("-short-errors"))) {
+            // Ignore
+
         } else {
             outstr(&err, S("pkg-config: "));
             outstr(&err, S("unknown option -"));
