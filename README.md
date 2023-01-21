@@ -164,6 +164,17 @@ For MSVC:
 
     $ cl /Z7 /W4 /RTScsu test_main.c
 
+### Fuzz testing
+
+`fuzz_main.c` is a platform layer implemented on top of [AFL++][]. Fuzzer
+input is supplied through a virtual file, and it exercises `.pc` parsing,
+variable expansion, and output processing.
+
+    $ afl-clang-fast -fsanitize=address,undefined fuzz_main.c
+    $ afl-fuzz -m32T -i/usr/share/pkgconfig -ofuzzout ./a.out
+
+
+[AFL++]: https://github.com/AFLplusplus/AFLplusplus
 [pkg-config]: https://www.freedesktop.org/wiki/Software/pkg-config/
 [pkgconf]: http://pkgconf.org/
 [w64devkit]: https://github.com/skeeto/w64devkit
