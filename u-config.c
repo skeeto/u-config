@@ -6,7 +6,8 @@
 #define VERSION "0.0.1"
 
 typedef int Size;
-#define Size_MAX ((Size)((unsigned)-1>>1) - (ALIGN-1))
+#define Size_MASK ((unsigned)-1)
+#define Size_MAX  ((Size)(Size_MASK>>1) - (ALIGN-1))
 
 typedef int Bool;
 typedef unsigned char Byte;
@@ -394,7 +395,7 @@ static Size hash(Str s)
         h *= 1111111111111111111;
     }
     h ^= h >> 33;
-    return (Size)h;
+    return (Size)(h & Size_MASK);
 }
 
 typedef struct Var {
