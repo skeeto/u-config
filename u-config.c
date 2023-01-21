@@ -1580,7 +1580,7 @@ static void appmain(Config conf)
 
     Bool libs = 0;
     Bool cflags = 0;
-    Bool silent = 1;
+    Bool silent = 0;
     Bool static_ = 0;
     Bool modversion = 0;
     Str variable = {0, 0};
