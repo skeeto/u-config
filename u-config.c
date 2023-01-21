@@ -806,6 +806,7 @@ static void usage(Out *out)
     "  --define-variable=NAME=VALUE, --variable=NAME\n"
     "  --libs, --libs-only-L, --libs-only-l, --libs-only-other\n"
     "  --modversion\n"
+    "  --newlines\n"
     "  --msvc-syntax\n"
     "  --static\n"
     "  -h, --help, --version\n";
@@ -1529,7 +1530,7 @@ typedef struct {
 
 static OutConfig newoutconf(Arena *a, Out *out, Out *err)
 {
-    OutConfig r = {a, out, err, 0, newstrset(a), Filter_ANY, 0, '\n'};
+    OutConfig r = {a, out, err, 0, newstrset(a), Filter_ANY, 0, ' '};
     return r;
 }
 
@@ -1680,6 +1681,9 @@ static void appmain(Config conf)
                 os_fail();
             }
             *insert(a, &global, c.head) = c.tail;
+
+        } else if (equals(r.arg, S("-newlines"))) {
+            outconf.delim = '\n';
 
         } else if (equals(r.arg, S("-exists"))) {
             // The check already happens, just disable the messages

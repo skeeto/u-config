@@ -39,6 +39,10 @@ pkg-config's idiosyncratic argument parsing — positional arguments are
 concatenated then retokenzied — and its undocumented `.pc` quote and
 backslash syntax.
 
+The `--newlines` flag is unique to u-config. It separates arguments by
+line feeds instead of spaces, which is useful in certain cases like the
+fish shell or when manually examining output.
+
 ## Build
 
 u-config compiles as one translation unit: no build system required, just
