@@ -809,6 +809,7 @@ static void usage(Out *out)
     "  --newlines\n"
     "  --msvc-syntax\n"
     "  --static\n"
+    "  --validate\n"
     "  -h, --help, --version\n";
     outstr(out, S(usage));
 }
@@ -1256,12 +1257,13 @@ typedef struct {
     Pkg *last;
     VersionOp op;
     Bool define_prefix;
+    Bool recursive;
 } Processor;
 
 static Processor newprocessor(Config *c, Out *err, Env *g, Pkgs *pkgs)
 {
     Search search = newsearch(&c->arena, c->envpath, c->fixedpath, c->delim);
-    Processor proc = {err, search, g, pkgs, 0, 0, 1};
+    Processor proc = {err, search, g, pkgs, 0, 0, 1, 1};
     return proc;
 }
 
@@ -1403,16 +1405,18 @@ static void process(Arena *a, Processor *proc, Str arg)
                 flush(err);
                 os_fail();
             }
-            top++;
-            stack[top].arg = pkg->requiresprivate;
-            stack[top].last = 0;
-            stack[top].op = 0;
-            stack[top].flags = 0;
-            top++;
-            stack[top].arg = pkg->requires;
-            stack[top].last = 0;
-            stack[top].op = 0;
-            stack[top].flags = (flags & ~Pkg_DIRECT) | Pkg_PUBLIC;
+            if (proc->recursive) {
+                top++;
+                stack[top].arg = pkg->requiresprivate;
+                stack[top].last = 0;
+                stack[top].op = 0;
+                stack[top].flags = 0;
+                top++;
+                stack[top].arg = pkg->requires;
+                stack[top].last = 0;
+                stack[top].op = 0;
+                stack[top].flags = (flags & ~Pkg_DIRECT) | Pkg_PUBLIC;
+            }
         }
         pkg->flags |= flags;
     }
@@ -1700,6 +1704,10 @@ static void appmain(Config conf)
 
         } else if (equals(r.arg, S("-short-errors"))) {
             // Ignore
+
+        } else if (equals(r.arg, S("-validate"))) {
+            silent = 1;
+            proc.recursive = 0;
 
         } else {
             outstr(&err, S("pkg-config: "));
