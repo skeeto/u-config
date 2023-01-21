@@ -39,6 +39,19 @@ amalgamation: pkg-config.c
 pkg-config.c: u-config.c cmdline.c win32_main.c
 	sed >$@ '/^#include "/d' u-config.c cmdline.c win32_main.c
 
+tests.exe: test_main.c u-config.c
+	$(CROSS)$(CC) -g3 -o $@ test_main.c \
+		-Wall -Wextra -Wconversion -Wno-sign-conversion -Wno-clobbered \
+	   -fsanitize=undefined -fsanitize-undefined-trap-on-error \
+
+tests: test_main.c u-config.c
+	$(CC) -g3 -o $@ test_main.c \
+		-Wall -Wextra -Wconversion -Wno-sign-conversion -Wno-clobbered \
+		-fsanitize=address,undefined
+
+check: tests$(EXE)
+	./tests
+
 clean:
 	rm -f pkg-config.exe pkg-config-debug.exe \
 	      pkg-config pkg-config-debug \

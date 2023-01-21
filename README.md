@@ -143,14 +143,26 @@ Do not link the `linux_amd64_main.c` platform with libc. It compiles to a
 
 The `DEBUG` macro enables assertions. Suggested debug build:
 
-	$ gcc -g3 -DDEBUG -Wall -Wextra -Wconversion -Wno-sign-conversion \
-	      -fsanitize=undefined -fsanitize-undefined-trap-on-error \
-          …platform arguments…
+    $ gcc -g3 -DDEBUG -Wall -Wextra -Wconversion -Wno-sign-conversion \
+          -fsanitize=undefined -fsanitize-undefined-trap-on-error \
+          PLATFORM_main.c
+
+For MSVC with run-time checks:
+
+    $ cl /Z7 /DDEBUG /W4 /RTScsu PLATFORM_main.c
+
+### Test suite
+
+The test suite is a libc-based platform layer and runs u-config through
+its entry point in various configurations on a virtual file system. Either
+build and run `test_main.c` as a platform, or use the suggested test
+configuration in the Makefile (set `EXE=.exe` on Windows):
+
+    $ make check
 
 For MSVC:
 
-    $ cl /Z7 /W4 …platform arguments…
-
+    $ cl /Z7 /W4 /RTScsu test_main.c
 
 [pkg-config]: https://www.freedesktop.org/wiki/Software/pkg-config/
 [pkgconf]: http://pkgconf.org/
