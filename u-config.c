@@ -818,50 +818,62 @@ static void usage(Out *out)
     outstr(out, S(usage));
 }
 
+typedef struct SearchNode {
+    struct SearchNode *next;
+    Str dir;
+} SearchNode;
+
 typedef struct {
-    Str *dirs;
-    Size count;
+    SearchNode *head;
+    SearchNode *tail;
+    Byte delim;
 } Search;
 
-static Size countpath(Str path, Byte delim)
+static Search newsearch(Byte delim)
 {
-    Size beg = 0;
-    Size end = 0;
-    Size count = 0;
-    for (; end <= path.len; end++) {
-        if (end==path.len || path.s[end]==delim) {
-            count += end > beg;
-            beg = end + 1;
-        }
-    }
-    return count;
-}
-
-static Size splitpath(Str *dirs, Str path, Byte delim)
-{
-    Size beg = 0;
-    Size end = 0;
-    Size npaths = 0;
-    for (; end <= path.len; end++) {
-        if (end==path.len || path.s[end]==delim) {
-            if (end > beg) {
-                Str dir = {path.s+beg, end-beg};
-                dirs[npaths++] = dir;
-            }
-            beg = end + 1;
-        }
-    }
-    return npaths;
-}
-
-static Search newsearch(Arena *a, Str envpath, Str fixedpath, Byte delim)
-{
-    Size count = countpath(envpath, delim) + countpath(fixedpath, delim);
-    Str *dirs = allocarray(a, SIZEOF(*dirs), count);
-    Size n = splitpath(dirs, envpath, delim);
-    splitpath(dirs+n, fixedpath, delim);
-    Search r = {dirs, count};
+    Search r = {.delim=delim};
     return r;
+}
+
+static void appenddir(Arena *a, Search *dirs, Str dir)
+{
+    SearchNode *node = alloc(a, SIZEOF(*node));
+    node->dir = dir;
+    node->next = 0;
+    if (dirs->tail) {
+        ASSERT(dirs->head);
+        dirs->tail->next = node;
+    } else {
+        ASSERT(!dirs->tail);
+        dirs->head = node;
+    }
+    dirs->tail = node;
+}
+
+static void appendpath(Arena *a, Search *dirs, Str path)
+{
+    while (path.len) {
+        Cut c = cut(path, dirs->delim);
+        Str dir = c.head;
+        if (dir.len) {
+            appenddir(a, dirs, dir);
+        }
+        path = c.tail;
+    }
+}
+
+static void prependpath(Arena *a, Search *dirs, Str path)
+{
+    if (!dirs->head) {
+        // Empty, so appending is the same a prepending
+        appendpath(a, dirs, path);
+    } else {
+        // Append to an empty Search, then transplant it
+        Search temp = newsearch(dirs->delim);
+        appendpath(a, &temp, path);
+        temp.tail->next = dirs->head;
+        dirs->head = temp.head;
+    }
 }
 
 static Bool realnameispath(Str realname)
@@ -995,8 +1007,8 @@ static Pkg findpackage(Arena *a, Search *dirs, Out *err, Str realname)
         }
     }
 
-    for (Size j = 0; j<dirs->count && !contents.s; j++) {
-        path = buildpath(a, dirs->dirs[j], realname);
+    for (SearchNode *n = dirs->head; n && !contents.s; n = n->next) {
+        path = buildpath(a, n->dir, realname);
         contents = readpackage(a, err, path, realname);
         path = cuttail(path, 1);  // remove null terminator
     }
@@ -1266,7 +1278,10 @@ typedef struct {
 
 static Processor newprocessor(Config *c, Out *err, Env *g, Pkgs *pkgs)
 {
-    Search search = newsearch(&c->arena, c->envpath, c->fixedpath, c->delim);
+    Arena *a = &c->arena;
+    Search search = newsearch(c->delim);
+    appendpath(a, &search, c->envpath);
+    appendpath(a, &search, c->fixedpath);
     Processor proc = {err, search, g, pkgs, 0, 0, 1, 1};
     return proc;
 }
