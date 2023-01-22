@@ -1675,7 +1675,7 @@ static void appmain(Config conf)
 
         } else if (equals(r.arg, S("-variable"))) {
             if (!r.value.s) {
-                r.value = getargopt(&err, &opts, S("-variable"));
+                r.value = getargopt(&err, &opts, r.arg);
             }
             variable = r.value;
 
@@ -1707,7 +1707,7 @@ static void appmain(Config conf)
 
         } else if (equals(r.arg, S("-define-variable"))) {
             if (!r.value.s) {
-                r.value = getargopt(&err, &opts, S("-define-variable"));
+                r.value = getargopt(&err, &opts, r.arg);
             }
             Cut c = cut(r.value, '=');
             if (!c.ok) {
