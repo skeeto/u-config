@@ -1438,7 +1438,7 @@ static void process(Arena *a, Processor *proc, Str arg)
                 stack[top].arg = pkg->requires;
                 stack[top].last = 0;
                 stack[top].op = 0;
-                stack[top].flags = (flags & ~Pkg_DIRECT) | Pkg_PUBLIC;
+                stack[top].flags = (flags & ~Pkg_DIRECT) | flags;
             }
         }
         pkg->flags |= flags;

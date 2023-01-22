@@ -162,6 +162,51 @@ static void test_badversion(void)
     }
 }
 
+static void test_private_transitive(void)
+{
+    // Scenario: a privately requires b which publicly requires c
+    // Expect: --libs should not include c without --static
+    Config conf = newtest_("private transitive");
+    newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
+        "Name:\n"
+        "Version:\n"
+        "Description:\n"
+        "Requires: x\n"
+        "Requires.private: b\n"
+        "Libs: -la\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/x.pc"), S(
+        "Name:\n"
+        "Version:\n"
+        "Description:\n"
+        "Libs: -lx\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/b.pc"), S(
+        "Name:\n"
+        "Version:\n"
+        "Description:\n"
+        "Requires: c\n"
+        "Libs: -lb\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/c.pc"), S(
+        "Name:\n"
+        "Version:\n"
+        "Description:\n"
+        "Requires.private: b\n"
+        "Libs: -lc\n"
+    ));
+
+    SHOULDPASS {
+        run(conf, S("--libs"), S("a"), E);
+    }
+    ASSERT(equals(context.output, S("-la -lx\n")));
+
+    SHOULDPASS {
+        run(conf, S("--libs"), S("--static"), S("a"), E);
+    }
+    ASSERT(equals(context.output, S("-la -lx -lb -lc\n")));
+}
+
 static Arena newarena_(Size cap)
 {
     Arena arena = {0};
@@ -177,6 +222,7 @@ int main(void)
     test_noargs();
     test_modversion();
     test_badversion();
+    test_private_transitive();
 
     free(context.arena.mem.s);  // to satisfy leak checkers
     puts("all tests pass");
