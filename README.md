@@ -27,7 +27,6 @@ summary:
 
 * Omits most `.pc` debugging features (`--print-…`)
 * No special handling of "uninstalled" packages, and no attendant knobs
-* No removal of standard system paths (e.g. `/usr/include`)
 * Skips checks unimplemented by pkg-config (i.e. `Conflicts:`)
 * Omits clunky redundant features (`--exists`, `--errors-to-stdout`, etc.)
 * Less strict `.pc` syntax

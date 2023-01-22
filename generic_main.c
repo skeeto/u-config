@@ -18,6 +18,14 @@
 #  endif
 #endif
 
+#ifndef PKG_CONFIG_SYSTEM_INCLUDE_PATH
+#  define PKG_CONFIG_SYSTEM_INCLUDE_PATH "/usr/include"
+#endif
+
+#ifndef PKG_CONFIG_SYSTEM_LIBRARY_PATH
+#  define PKG_CONFIG_SYSTEM_LIBRARY_PATH "/lib" PATHDELIM "/usr/lib"
+#endif
+
 #ifndef PKG_CONFIG_PREFIX
 #  define PKG_CONFIG_PREFIX "/usr"
 #endif
@@ -84,6 +92,14 @@ int main(int argc, char **argv)
     conf.fixedpath = fromcstr_(getenv("PKG_CONFIG_LIBDIR"));
     if (!conf.fixedpath.s) {
         conf.fixedpath = S(pkg_config_path);
+    }
+    conf.sys_incpath = fromcstr_(getenv("PKG_CONFIG_SYSTEM_INCLUDE_PATH"));
+    if (!conf.sys_incpath.s) {
+        conf.sys_incpath = S(PKG_CONFIG_SYSTEM_INCLUDE_PATH);
+    }
+    conf.sys_libpath = fromcstr_(getenv("PKG_CONFIG_SYSTEM_LIBRARY_PATH"));
+    if (!conf.sys_libpath.s) {
+        conf.sys_libpath = S(PKG_CONFIG_SYSTEM_LIBRARY_PATH);
     }
     conf.top_builddir  = fromcstr_(getenv("PKG_CONFIG_TOP_BUILD_DIR"));
 

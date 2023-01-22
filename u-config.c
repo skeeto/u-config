@@ -51,6 +51,8 @@ typedef struct {
     Str envpath;      // $PKG_CONFIG_PATH or empty
     Str fixedpath;    // $PKG_CONFIG_LIBDIR or default
     Str top_builddir; // $PKG_CONFIG_TOP_BUILD_DIR or default
+    Str sys_incpath;  // $PKG_CONFIG_SYSTEM_INCLUDE_PATH or default
+    Str sys_libpath;  // $PKG_CONFIG_SYSTEM_LIBRARY_PATH or default
     Bool define_prefix;
     Byte delim;
 } Config;
@@ -805,6 +807,7 @@ static void usage(Out *out)
     "  --cflags, --cflags-only-I, --cflags-only-other\n"
     "  --define-prefix, --dont-define-prefix\n"
     "  --define-variable=NAME=VALUE, --variable=NAME\n"
+    "  --keep-system-cflags, --keep-system-libs\n"
     "  --libs, --libs-only-L, --libs-only-l, --libs-only-other\n"
     "  --modversion\n"
     "  --newlines\n"
@@ -1539,6 +1542,32 @@ static OutConfig newoutconf(Arena *a, Out *out, Out *err)
     return r;
 }
 
+static void insertsyspath(OutConfig *conf, Str path, Byte delim, Byte flag)
+{
+    Byte flagbuf[] = {'-', flag};
+    Str prefix = {flagbuf, SIZEOF(flagbuf)};
+    while (path.len) {
+        Arena snapshot = *conf->arena;
+        Cut c = cut(path, delim);
+        Str dir = c.head;
+        path = c.tail;
+        if (!dir.len) {
+            continue;
+        }
+        Str syspath = newstr(&snapshot, prefix.len+dir.len);
+        copy(copy(syspath, prefix), dir);
+        // NOTE(NRK): Technically, the path doesn't need to follow the flag
+        // immediately (e.g `-I /usr/include`). But I have not seen a single
+        // pc file that does this.
+        //
+        // In fact, `pkgconf` also fails to recognize `-I /usr/include` as
+        // a system include path! So this should be fine in practice.
+        if (insertstr(&snapshot, conf->seen, syspath)) {
+            *conf->arena = snapshot;
+        }
+    }
+}
+
 // Process the field while writing it to the output.
 static void fieldout(OutConfig *conf, Pkg *p, Str field)
 {
@@ -1589,6 +1618,8 @@ static void appmain(Config conf)
     Bool silent = 0;
     Bool static_ = 0;
     Bool modversion = 0;
+    Bool print_sysinc = 0;
+    Bool print_syslib = 0;
     Str variable = {0, 0};
 
     proc.define_prefix = conf.define_prefix;
@@ -1597,6 +1628,8 @@ static void appmain(Config conf)
     }
 
     *insert(a, &global, S("pc_path")) = conf.fixedpath;
+    *insert(a, &global, S("pc_system_includedirs")) = conf.sys_incpath;
+    *insert(a, &global, S("pc_system_libdirs")) = conf.sys_libpath;
     *insert(a, &global, S("pc_sysrootdir")) = S("/");
     *insert(a, &global, S("pc_top_builddir")) = conf.top_builddir;
 
@@ -1707,10 +1740,10 @@ static void appmain(Config conf)
             // Ignore
 
         } else if (equals(r.arg, S("-keep-system-cflags"))) {
-            // Ignore: already the default behavior
+            print_sysinc = 1;
 
         } else if (equals(r.arg, S("-keep-system-libs"))) {
-            // Ignore: already the default behavior
+            print_syslib = 1;
 
         } else if (equals(r.arg, S("-validate"))) {
             silent = 1;
@@ -1728,6 +1761,14 @@ static void appmain(Config conf)
 
     if (silent) {
         err = newnullout();
+    }
+
+    if (!print_sysinc) {
+        insertsyspath(&outconf, conf.sys_incpath, conf.delim, 'I');
+    }
+
+    if (!print_syslib) {
+        insertsyspath(&outconf, conf.sys_libpath, conf.delim, 'L');
     }
 
     for (Size i = 0; i < nargs; i++) {
