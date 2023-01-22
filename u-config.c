@@ -814,6 +814,7 @@ static void usage(Out *out)
     "  --msvc-syntax\n"
     "  --static\n"
     "  --validate\n"
+    "  --with-path=PATH\n"
     "  -h, --help, --version\n";
     outstr(out, S(usage));
 }
@@ -1716,6 +1717,12 @@ static void appmain(Config conf)
         } else if (equals(r.arg, S("-cflags-only-other"))) {
             cflags = 1;
             filterc = Filter_OTHERC;
+
+        } else if (equals(r.arg, S("-with-path"))) {
+            if (!r.value.s) {
+                r.value = getargopt(&err, &opts, r.arg);
+            }
+            prependpath(a, &proc.search, r.value);
 
         } else if (equals(r.arg, S("-msvc-syntax"))) {
             outconf.msvc = 1;
