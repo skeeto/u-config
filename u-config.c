@@ -1706,6 +1706,9 @@ static void appmain(Config conf)
         } else if (equals(r.arg, S("-short-errors"))) {
             // Ignore
 
+        } else if (equals(r.arg, S("-keep-system-cflags"))) {
+            // Ignore: already the default behavior
+
         } else if (equals(r.arg, S("-keep-system-libs"))) {
             // Ignore: already the default behavior
 
