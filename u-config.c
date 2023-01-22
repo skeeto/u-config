@@ -292,7 +292,7 @@ static Cut cut(Str s, Byte delim)
         }
     }
     if (len == s.len) {
-        Cut r = {0};
+        Cut r = {s, cuthead(s, s.len), 0};
         return r;
     }
     Cut r = {{s.s, len}, cuthead(s, len+1), 1};
