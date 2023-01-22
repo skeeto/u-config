@@ -10,6 +10,14 @@
      "/usr/share/pkgconfig"
 #endif
 
+#ifndef PKG_CONFIG_SYSTEM_INCLUDE_PATH
+#  define PKG_CONFIG_SYSTEM_INCLUDE_PATH "/usr/include"
+#endif
+
+#ifndef PKG_CONFIG_SYSTEM_LIBRARY_PATH
+#  define PKG_CONFIG_SYSTEM_LIBRARY_PATH "/lib:/usr/lib"
+#endif
+
 #define SYS_write 1
 #define SYS_open  2
 #define SYS_close 3
@@ -193,6 +201,8 @@ int os_main(int argc, char **argv, char **envp)
     }
 
     conf.fixedpath = S(PKG_CONFIG_LIBDIR);
+    conf.sys_incpath = S(PKG_CONFIG_SYSTEM_INCLUDE_PATH);
+    conf.sys_libpath = S(PKG_CONFIG_SYSTEM_LIBRARY_PATH);
 
     for (char **v = envp; *v; v++) {
         Cut c = cut(fromcstr_(*v), '=');
@@ -205,6 +215,10 @@ int os_main(int argc, char **argv, char **envp)
             conf.fixedpath = value;
         } else if (equals(name, S("PKG_CONFIG_TOP_BUILD_DIR"))) {
             conf.top_builddir = value;
+        } else if (equals(name, S("PKG_CONFIG_SYSTEM_INCLUDE_PATH"))) {
+            conf.sys_incpath = value;
+        } else if (equals(name, S("PKG_CONFIG_SYSTEM_LIBRARY_PATH"))) {
+            conf.sys_libpath = value;
         }
     }
 

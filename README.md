@@ -31,9 +31,15 @@ summary:
 * Omits clunky redundant features (`--exists`, `--errors-to-stdout`, etc.)
 * Less strict `.pc` syntax
 
-It still supports pkg-config standard run-time configuration variables:
-`PKG_CONFIG_PATH`, `PKG_CONFIG_LIBDIR`, `PKG_CONFIG_TOP_BUILD_DIR`. See
-the pkg-config documentation for details. It also closely follows
+It still supports the import pkg-config run-time environment variables:
+
+* `PKG_CONFIG_PATH`
+* `PKG_CONFIG_LIBDIR`
+* `PKG_CONFIG_TOP_BUILD_DIR`
+* `PKG_CONFIG_SYSTEM_INCLUDE_PATH`
+* `PKG_CONFIG_SYSTEM_LIBRARY_PATH`
+
+See the pkg-config documentation for details. It also closely follows
 pkg-config's idiosyncratic argument parsing — positional arguments are
 concatenated then retokenzied — and its undocumented `.pc` quote and
 backslash syntax.
@@ -107,6 +113,12 @@ usually not useful.
 * `PKG_CONFIG_DEFINE_PREFIX`: Sets the default for `--define-prefix` /
   `--dont-define-prefix`. Defaults to true on Windows, false otherwise.
 
+* `PKG_CONFIG_SYSTEM_INCLUDE_PATH`: Like the run-time environment variable
+  but sets the static default.
+
+* `PKG_CONFIG_SYSTEM_LIBRARY_PATH`: Like the run-time environment variable
+  but sets the static default.
+
 Examples:
 
     $ gcc -DPKG_CONFIG_PREFIX="\"$HOME/.local\"" ...
@@ -135,8 +147,12 @@ Example, if just outside a sysroot which identifies the architecture:
 ### x86-64 Linux configuration options
 
 Do not link the `linux_amd64_main.c` platform with libc. It compiles to a
-~20kB static x86-64 executable. It has just one configuration knob,
-`PKG_CONFIG_LIBDIR`, which works the same as the generic platform.
+~20kB static x86-64 executable. It supports these configuration macros
+with the same behavior as the generic platform.
+
+* `PKG_CONFIG_LIBDIR`
+* `PKG_CONFIG_SYSTEM_INCLUDE_PATH`
+* `PKG_CONFIG_SYSTEM_LIBRARY_PATH`
 
 ### Debugging
 

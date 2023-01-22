@@ -91,6 +91,13 @@ static Str installdir_(Arena *a)
     return dirname(dirname(path));
 }
 
+static Str append2_(Arena *a, Str pre, Str suf)
+{
+    Str s = newstr(a, pre.len+suf.len);
+    copy(copy(s, pre), suf);
+    return s;
+}
+
 static Str makepath_(Arena *a, Str base, Str lib, Str share)
 {
     Str delim = S(";");
@@ -133,15 +140,17 @@ int mainCRTStartup(void)
         conf.args[i] = fromcstr_(argv[i+1]);
     }
 
+    Str base = installdir_(a);
     conf.envpath = fromenv_(a, L"PKG_CONFIG_PATH");
     conf.fixedpath = fromenv_(a, L"PKG_CONFIG_LIBDIR");
     if (!conf.fixedpath.s) {
-        Str base  = installdir_(a);
         Str lib   = S(PKG_CONFIG_PREFIX "/lib/pkgconfig");
         Str share = S(PKG_CONFIG_PREFIX "/share/pkgconfig");
         conf.fixedpath = makepath_(a, base, lib, share);
     }
-    conf.top_builddir  = fromenv_(a, L"PKG_CONFIG_TOP_BUILD_DIR");
+    conf.top_builddir = fromenv_(a, L"PKG_CONFIG_TOP_BUILD_DIR");
+    conf.sys_incpath  = append2_(a, base, S(PKG_CONFIG_PREFIX "/include"));
+    conf.sys_libpath  = append2_(a, base, S(PKG_CONFIG_PREFIX "/lib"));
 
     appmain(conf);
     ExitProcess(0);
