@@ -809,6 +809,7 @@ static void usage(Out *out)
     "  --define-variable=NAME=VALUE, --variable=NAME\n"
     "  --keep-system-cflags, --keep-system-libs\n"
     "  --libs, --libs-only-L, --libs-only-l, --libs-only-other\n"
+    "  --maximum-traverse-depth=N\n"
     "  --modversion\n"
     "  --newlines\n"
     "  --msvc-syntax\n"
@@ -1272,6 +1273,7 @@ typedef struct {
     Env *global;
     Pkgs *pkgs;
     Pkg *last;
+    int maxdepth;
     VersionOp op;
     Bool define_prefix;
     Bool recursive;
@@ -1283,7 +1285,8 @@ static Processor newprocessor(Config *c, Out *err, Env *g, Pkgs *pkgs)
     Search search = newsearch(c->delim);
     appendpath(a, &search, c->envpath);
     appendpath(a, &search, c->fixedpath);
-    Processor proc = {err, search, g, pkgs, 0, 0, 1, 1};
+    int maxdepth = (unsigned)-1 >> 1;
+    Processor proc = {err, search, g, pkgs, 0, maxdepth, 0, 1, 1};
     return proc;
 }
 
@@ -1425,7 +1428,7 @@ static void process(Arena *a, Processor *proc, Str arg)
                 flush(err);
                 os_fail();
             }
-            if (proc->recursive) {
+            if (proc->recursive && top+1<proc->maxdepth) {
                 top++;
                 stack[top].arg = pkg->requiresprivate;
                 stack[top].last = 0;
@@ -1615,6 +1618,21 @@ static void fieldout(OutConfig *conf, Pkg *p, Str field)
     }
 }
 
+static int parseuint(Str s, int hi)
+{
+    int v = 0;
+    for (Size i = 0; i < s.len; i++) {
+        Byte c = s.s[i];
+        if (digit(c)) {
+            v = v*10 + c - '0';
+            if (v >= hi) {
+                return hi;
+            }
+        }
+    }
+    return v;
+}
+
 static void appmain(Config conf)
 {
     Arena *a = &conf.arena;
@@ -1723,6 +1741,12 @@ static void appmain(Config conf)
                 r.value = getargopt(&err, &opts, r.arg);
             }
             prependpath(a, &proc.search, r.value);
+
+        } else if (equals(r.arg, S("-maximum-traverse-depth"))) {
+            if (!r.value.s) {
+                r.value = getargopt(&err, &opts, r.arg);
+            }
+            proc.maxdepth = parseuint(r.value, 1000);
 
         } else if (equals(r.arg, S("-msvc-syntax"))) {
             outconf.msvc = 1;
