@@ -1344,7 +1344,8 @@ static void setprefix(Arena *a, Pkg *p)
 typedef struct {
     Str arg;
     Pkg *last;
-    int flags;
+    short depth;
+    short flags;
     VersionOp op;
 } ProcState;
 
@@ -1363,6 +1364,7 @@ static void process(Arena *a, Processor *proc, Str arg)
     int top = 0;
     stack[0].arg = arg;
     stack[0].last = proc->last;
+    stack[0].depth = 0;
     stack[0].flags = Pkg_DIRECT | Pkg_PUBLIC;
     stack[0].op = 0;
 
@@ -1413,7 +1415,8 @@ static void process(Arena *a, Processor *proc, Str arg)
             continue;
         }
 
-        int flags = s->flags;
+        short depth = s->depth + 1;
+        short flags = s->flags;
         Pkg *pkg = s->last = locate(a, pkgs, pathtorealname(tok));
         if (!pkg->contents.s) {
             *pkg = findpackage(a, search, err, tok);
@@ -1429,17 +1432,19 @@ static void process(Arena *a, Processor *proc, Str arg)
                 flush(err);
                 os_fail();
             }
-            if (proc->recursive && top+1<proc->maxdepth) {
+            if (proc->recursive && depth<proc->maxdepth) {
                 top++;
                 stack[top].arg = pkg->requiresprivate;
                 stack[top].last = 0;
-                stack[top].op = 0;
+                stack[top].depth = depth;
                 stack[top].flags = 0;
+                stack[top].op = 0;
                 top++;
                 stack[top].arg = pkg->requires;
                 stack[top].last = 0;
-                stack[top].op = 0;
+                stack[top].depth = depth;
                 stack[top].flags = (flags & ~Pkg_DIRECT) | flags;
+                stack[top].op = 0;
             }
         }
         pkg->flags |= flags;

@@ -163,6 +163,40 @@ static void test_badversion(void)
     }
 }
 
+static void test_maximum_traverse_depth(void)
+{
+    Config conf = newtest_("--maximum-traverse-depth");
+    newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
+        PCHDR
+        "Requires: b\n"
+        "Cflags: -Da\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/b.pc"), S(
+        PCHDR
+        "Requires: c\n"
+        "Cflags: -Db\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/c.pc"), S(
+        PCHDR
+        "Cflags: -Dc\n"
+    ));
+
+    SHOULDPASS {
+        run(conf, S("--maximum-traverse-depth=1"), S("--cflags"), S("a"), E);
+    }
+    ASSERT(equals(context.output, S("-Da\n")));
+
+    SHOULDPASS {
+        run(conf, S("--maximum-traverse-depth=2"), S("--cflags"), S("a"), E);
+    }
+    ASSERT(equals(context.output, S("-Da -Db\n")));
+
+    SHOULDPASS {
+        run(conf, S("--maximum-traverse-depth=3"), S("--cflags"), S("a"), E);
+    }
+    ASSERT(equals(context.output, S("-Da -Db -Dc\n")));
+}
+
 static void test_private_transitive(void)
 {
     // Scenario: a privately requires b which publicly requires c
@@ -238,6 +272,7 @@ int main(void)
     test_noargs();
     test_modversion();
     test_badversion();
+    test_maximum_traverse_depth();
     test_private_transitive();
     test_lol();
 
