@@ -1349,6 +1349,16 @@ typedef struct {
     VersionOp op;
 } ProcState;
 
+static void failmaxrecurse(Out *err, Str tok)
+{
+    outstr(err, S("pkg-config: "));
+    outstr(err, S("exceeded max recursion depth on '"));
+    outstr(err, tok);
+    outstr(err, S("'\n"));
+    flush(err);
+    os_fail();
+}
+
 static void process(Arena *a, Processor *proc, Str arg)
 {
     Out *err = proc->err;
@@ -1418,21 +1428,35 @@ static void process(Arena *a, Processor *proc, Str arg)
         short depth = s->depth + 1;
         short flags = s->flags;
         Pkg *pkg = s->last = locate(a, pkgs, pathtorealname(tok));
-        if (!pkg->contents.s) {
+        if (pkg->contents.s) {
+            if (flags&Pkg_PUBLIC && !(pkg->flags & Pkg_PUBLIC)) {
+                // We're on a public branch, but this package was
+                // previously loaded as private. Recursively traverse
+                // its public requires and mark all as public.
+                pkg->flags |= Pkg_PUBLIC;
+                if (proc->recursive && depth<proc->maxdepth) {
+                    if (top >= COUNTOF(stack)-1) {
+                        failmaxrecurse(err, tok);
+                    }
+                    top++;
+                    stack[top].arg = pkg->requires;
+                    stack[top].last = 0;
+                    stack[top].depth = depth;
+                    stack[top].flags = (flags & ~Pkg_DIRECT) | flags;
+                    stack[top].op = 0;
+                }
+            }
+        } else {
+            // Package hasn't been loaded yet, so find and load it.
             *pkg = findpackage(a, search, err, tok);
             if (proc->define_prefix) {
                 setprefix(a, pkg);
             }
             pkgexpand(a, err, global, pkg);
-            if (top >= COUNTOF(stack)-2) {
-                outstr(err, S("pkg-config: "));
-                outstr(err, S("exceeded max recursion depth on '"));
-                outstr(err, tok);
-                outstr(err, S("'\n"));
-                flush(err);
-                os_fail();
-            }
             if (proc->recursive && depth<proc->maxdepth) {
+                if (top >= COUNTOF(stack)-2) {
+                    failmaxrecurse(err, tok);
+                }
                 top++;
                 stack[top].arg = pkg->requiresprivate;
                 stack[top].last = 0;

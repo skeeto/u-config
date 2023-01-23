@@ -241,6 +241,40 @@ static void test_private_transitive(void)
     EXPECT("-la -lx -lb -lc\n");
 }
 
+static void test_revealed_transitive(void)
+{
+    // Scenario: a privately requires b, which requires x
+    // Expect: "--libs a" lists only a, "--libs a b" reveals x
+    //
+    // The trouble is that x is initially loaded private. However, when
+    // laoding b it should become public, and so must be revisited in
+    // traversal and marked as such.
+    Config conf = newtest_("revealed transitive");
+    newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
+        PCHDR
+        "Requires.private: b\n"
+        "Libs: -la\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/b.pc"), S(
+        PCHDR
+        "Requires: x\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/x.pc"), S(
+        PCHDR
+        "Libs: -lx\n"
+    ));
+
+    SHOULDPASS {
+        run(conf, S("--libs"), S("a"), E);
+    }
+    EXPECT("-la\n");
+
+    SHOULDPASS {
+        run(conf, S("--libs"), S("a"), S("b"), E);
+    }
+    EXPECT("-la -lx\n");
+}
+
 static void test_lol(void)
 {
     Config conf = newtest_("a billion laughs");
@@ -281,6 +315,7 @@ int main(void)
     test_badversion();
     test_maximum_traverse_depth();
     test_private_transitive();
+    test_revealed_transitive();
     test_lol();
 
     free(context.arena.mem.s);  // to satisfy leak checkers
