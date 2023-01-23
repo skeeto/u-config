@@ -156,13 +156,6 @@ static void *zalloc(Arena *a, Size size)
     return fillstr(r, 0).s;
 }
 
-static void *zallocn(Arena *a, Size size, Size count)
-{
-    Byte *p = allocarray(a, size, count);
-    Str r = {p, size*count};
-    return fillstr(r, 0).s;
-}
-
 static Str maxstr(Arena *a)
 {
     Size len = a->mem.len - a->off;
@@ -199,17 +192,26 @@ static Str copy(Str dst, Str src)
     return r;
 }
 
-static Bool equals(Str a, Str b)
+// Compare strings, returning -1, 0, or +1.
+static int orderstr(Str a, Str b)
 {
-    // note: "null" strings are still perfectly valid strings
-    if (a.len != b.len) {
+    // NOTE: "null" strings are still valid strings
+    Size len = a.len<b.len ? a.len : b.len;
+    for (Size i = 0; i < len; i++) {
+        int d = a.s[i] - b.s[i];
+        if (d) {
+            return d < 0 ? -1 : +1;
+        }
+    }
+    if (a.len == b.len) {
         return 0;
     }
-    Size count = 0;
-    for (Size i = 0; i < a.len; i++) {
-        count += a.s[i] == b.s[i];
-    }
-    return count == a.len;
+    return a.len<b.len ? -1 : +1;
+}
+
+static Bool equals(Str a, Str b)
+{
+    return 0 == orderstr(a, b);
 }
 
 static Str cuthead(Str s, Size off)
@@ -245,6 +247,17 @@ static Str taketail(Str s, Size len)
 static Bool startswith(Str s, Str prefix)
 {
     return s.len>=prefix.len && equals(takehead(s, prefix.len), prefix);
+}
+
+static Size hash(Str s)
+{
+    unsigned long long h = 257;
+    for (Size i = 0; i < s.len; i++) {
+        h ^= s.s[i];
+        h *= 1111111111111111111;
+    }
+    h ^= h >> 33;
+    return (Size)(h & Size_MASK);
 }
 
 typedef struct {
@@ -300,6 +313,66 @@ static Cut cut(Str s, Byte delim)
     }
     Cut r = {{s.s, len}, cuthead(s, len+1), 1};
     return r;
+}
+
+// Intrusive treap, embed at the beginning of nodes
+typedef struct Treap {
+    struct Treap *parent;
+    struct Treap *child[2];
+    Str key;
+} Treap;
+
+// Low-level treap search and insertion. It uses the given size when
+// allocating a new node, which must be the size of the node containing
+// the intrusive Treap struct. If given no arena, returns null when the
+// key is not found.
+static void *treapinsert(Arena *a, Treap **t, Str key, Size size)
+{
+    // Traverse down to a matching node or its leaf location
+    Treap *parent = 0;
+    Treap **target = t;
+    while (*target) {
+        parent = *target;
+        switch (orderstr(key, parent->key)) {
+        case -1: target = parent->child + 0; break;
+        case  0: return parent;
+        case +1: target = parent->child + 1; break;
+        }
+    }
+
+    // None found, insert a new leaf
+    if (!a) {
+        return 0;  // "only browsing, thanks"
+    }
+    Treap *node = zalloc(a, size);
+    node->key = key;
+    node->parent = parent;
+    *target = node;
+
+    // Randomly rotate the tree according to the hash
+    Size keyhash = hash(key);
+    while (node->parent && hash(node->parent->key)<keyhash) {
+        parent = node->parent;
+
+        // Swap places with parent, also updating grandparent
+        node->parent = parent->parent;
+        parent->parent = node;
+        if (node->parent) {
+            int i = node->parent->child[0] == parent;
+            node->parent->child[!i] = node;
+        } else {
+            *t = node;
+        }
+
+        // Move the opposing child to the ex-parent
+        int i = parent->child[0] == node;
+        parent->child[!i] = node->child[i];
+        if (node->child[i]) {
+            node->child[i]->parent = parent;
+        }
+        node->child[i] = parent;
+    }
+    return node;
 }
 
 typedef struct {
@@ -390,36 +463,14 @@ static void outbyte(Out *out, Byte b)
     outstr(out, s);
 }
 
-static Size hash(Str s)
-{
-    unsigned long long h = 257;
-    for (Size i = 0; i < s.len; i++) {
-        h ^= s.s[i];
-        h *= 1111111111111111111;
-    }
-    h ^= h >> 33;
-    return (Size)(h & Size_MASK);
-}
-
 typedef struct Var {
-    struct Var *next;
-    Str name;
+    Treap node;
     Str value;
 } Var;
 
 typedef struct {
-    Size mask;
-    Var **slots;
+    Treap *vars;
 } Env;
-
-static Env newenv(Arena *a, int exp)
-{
-    Size len = (Size)1 << exp;
-    Env env = {
-        len-1, zallocn(a, SIZEOF(*env.slots), len)
-    };
-    return env;
-}
 
 // Return a pointer to the binding so that the caller can choose to fill
 // it. The arena is optional. If given, the binding will be created and
@@ -427,28 +478,8 @@ static Env newenv(Arena *a, int exp)
 // valid and will automatically populate it as needed.
 static Str *insert(Arena *a, Env *e, Str name)
 {
-    if (!e->slots) {
-        if (!a) {
-            return 0;
-        }
-        *e = newenv(a, 6);
-    }
-
-    Size i = hash(name) & e->mask;
-    Var **last = e->slots + i;
-    for (Var *v = e->slots[i]; v; v = v->next) {
-        if (equals(v->name, name)) {
-            return &v->value;
-        }
-        last = &v->next;
-    }
-    if (!a) {
-        return 0;
-    }
-    Var *entry = zalloc(a, SIZEOF(*entry));
-    entry->name = name;
-    *last = entry;
-    return &entry->value;
+    Var *var = treapinsert(a, &e->vars, name, SIZEOF(Var));
+    return var ? &var->value : 0;
 }
 
 // Try to find the binding in the global environment, then failing that,
@@ -499,7 +530,7 @@ static Str buildpath(Arena *a, Str dir, Str pc)
 typedef enum {Pkg_DIRECT=1<<0, Pkg_PUBLIC=1<<1} PkgFlags;
 
 typedef struct Pkg {
-    struct Pkg *next;  // hash table slot list
+    Treap node;
     struct Pkg *list;  // total load order list
     Str path;
     Str realname;
@@ -544,43 +575,25 @@ static Str *fieldbyname(Pkg *p, Str name)
 }
 
 typedef struct {
-    Size mask;
-    Size count;
+    Treap *pkgs;
     Pkg *head, *tail;
-    Pkg **slots;
+    Size count;
 } Pkgs;
-
-static Pkgs newpackages(Arena *a, int exp)
-{
-    Size len = (Size)1 << exp;
-    Pkgs t = {
-        len-1, 0, 0, 0, zallocn(a, SIZEOF(*t.slots), len)
-    };
-    return t;
-}
 
 // Locate a previously-loaded package, or allocate zero-initialized
 // space in the set for a new package.
 static Pkg *locate(Arena *a, Pkgs *t, Str realname)
 {
-    Size i = hash(realname) & t->mask;
-    Pkg **last = t->slots + i;
-    for (Pkg *p = t->slots[i]; p; p = p->next) {
-        if (equals(p->realname, realname)) {
-            return p;
+    Pkg *p = treapinsert(a, &t->pkgs, realname, SIZEOF(Pkg));
+    if (!p->realname.s) {
+        t->count++;
+        p->realname = realname;
+        if (!t->head) {
+            t->head = t->tail = p;
+        } else {
+            t->tail->list = p;
+            t->tail = p;
         }
-        last = &p->next;
-    }
-
-    t->count++;
-    Pkg *p = zalloc(a, SIZEOF(*p));
-    p->name = realname;
-    *last = p;
-    if (!t->head) {
-        t->head = t->tail = p;
-    } else {
-        t->tail->list = p;
-        t->tail = p;
     }
     return p;
 }
@@ -995,6 +1008,21 @@ static void expand(Out *out, Out *err, Env *global, Pkg *p, Str str)
     }
 }
 
+// Merge and expand data from "update" into "base".
+static void expandmerge(Arena *a, Out *err, Env *g, Pkg *base, Pkg *update)
+{
+    base->path = update->path;
+    base->contents = update->contents;
+    base->env = update->env;
+    base->flags = update->flags;
+    for (int i = 0; i < PKG_NFIELDS; i++) {
+        Out mem = newmembuf(a);
+        Str src = *fieldbyid(update, i);
+        expand(&mem, err, g, update, src);
+        *fieldbyid(base, i) = finalize(&mem);
+    }
+}
+
 static Pkg findpackage(Arena *a, Search *dirs, Out *err, Str realname)
 {
     Str path = {0, 0};
@@ -1172,7 +1200,7 @@ static DequoteResult dequote(Arena *a, Str s)
 
 // Compare version strings, returning [-1, 0, +1]. Follows the RPM
 // version comparison specification like the original pkg-config.
-static int compare(Str va, Str vb)
+static int compareversions(Str va, Str vb)
 {
     Size i = 0;
     while (i<va.len && i<vb.len) {
@@ -1306,16 +1334,6 @@ static void procfail(Out *err, VersionOp op, Pkg *p)
     os_fail();
 }
 
-static void pkgexpand(Arena *a, Out *err, Env *g, Pkg *p)
-{
-    for (int i = 0; i < PKG_NFIELDS; i++) {
-        Out mem = newmembuf(a);
-        Str *field = fieldbyid(p, i);
-        expand(&mem, err, g, p, *field);
-        *field = finalize(&mem);
-    }
-}
-
 // Wrap the string in quotes if it contains whitespace.
 static Str maybequote(Arena *a, Str s)
 {
@@ -1392,7 +1410,7 @@ static void process(Arena *a, Processor *proc, Str arg)
         stack[top].arg = pair.tail;
 
         if (s->op) {
-            int cmp = compare(s->last->version, tok);
+            int cmp = compareversions(s->last->version, tok);
             if (!validcompare(s->op, cmp)) {
                 outstr(err, S("pkg-config: "));
                 outstr(err, S("requested '"));
@@ -1448,11 +1466,11 @@ static void process(Arena *a, Processor *proc, Str arg)
             }
         } else {
             // Package hasn't been loaded yet, so find and load it.
-            *pkg = findpackage(a, search, err, tok);
+            Pkg newpkg = findpackage(a, search, err, tok);
             if (proc->define_prefix) {
-                setprefix(a, pkg);
+                setprefix(a, &newpkg);
             }
-            pkgexpand(a, err, global, pkg);
+            expandmerge(a, err, global, pkg, &newpkg);
             if (proc->recursive && depth<proc->maxdepth) {
                 if (top >= COUNTOF(stack)-2) {
                     failmaxrecurse(err, tok);
@@ -1536,42 +1554,24 @@ static void msvcize(Out *out, Str arg)
     }
 }
 
-typedef struct StrSetNode {
-    struct StrSetNode *next;
-    Str str;
-} StrSetNode;
+typedef struct {
+    Treap node;
+    Bool present;
+} StrSetEntry;
 
 typedef struct {
-    Size mask;
-    StrSetNode **slots;
+    Treap *set;
 } StrSet;
 
-static StrSet newstrset(Arena *a)
-{
-    Size count = (Size)1 << 6;
-    StrSet r = {
-        count - 1,
-        zallocn(a, SIZEOF(*r.slots), count),
-    };
-    return r;
-}
-
 // Try to insert the string into the set, returning true on success.
-static Bool insertstr(Arena *a, StrSet set, Str s)
+static Bool insertstr(Arena *a, StrSet *set, Str s)
 {
-    Size i = hash(s) & set.mask;
-    StrSetNode **last = set.slots + i;
-    for (StrSetNode *n = set.slots[i]; n; n = n->next) {
-        if (equals(s, n->str)) {
-            return 0;
-        }
-        last = &n->next;
+    StrSetEntry *e = treapinsert(a, &set->set, s, SIZEOF(StrSetEntry));
+    if (!e->present) {
+        e->present = 1;
+        return 1;
     }
-    StrSetNode *n = alloc(a, SIZEOF(*n));
-    n->next = 0;
-    n->str = s;
-    *last = n;
-    return 1;
+    return 0;
 }
 
 typedef struct {
@@ -1587,7 +1587,7 @@ typedef struct {
 
 static OutConfig newoutconf(Arena *a, Out *out, Out *err)
 {
-    OutConfig r = {a, out, err, 0, newstrset(a), Filter_ANY, 0, ' '};
+    OutConfig r = {a, out, err, 0, {0}, Filter_ANY, 0, ' '};
     return r;
 }
 
@@ -1611,7 +1611,7 @@ static void insertsyspath(OutConfig *conf, Str path, Byte delim, Byte flag)
         //
         // In fact, `pkgconf` also fails to recognize `-I /usr/include` as
         // a system include path! So this should be fine in practice.
-        if (insertstr(&snapshot, conf->seen, syspath)) {
+        if (insertstr(&snapshot, &conf->seen, syspath)) {
             *conf->arena = snapshot;
         }
     }
@@ -1633,7 +1633,7 @@ static void fieldout(OutConfig *conf, Pkg *p, Str field)
             flush(conf->err);
             os_fail();
         }
-        if (filterok(f, r.arg) && insertstr(&tentative, conf->seen, r.arg)) {
+        if (filterok(f, r.arg) && insertstr(&tentative, &conf->seen, r.arg)) {
             *a = tentative;  // keep the allocations
             if (conf->count++) {
                 outbyte(conf->out, conf->delim);
@@ -1671,7 +1671,7 @@ static void appmain(Config conf)
     Env global = {0};
     Filter filterc = Filter_ANY;
     Filter filterl = Filter_ANY;
-    Pkgs pkgs = newpackages(a, 8);
+    Pkgs pkgs = {0};
     Out out = newoutput(a, 1, 1<<12);
     Out err = newoutput(a, 2, 1<<7);
     Processor proc = newprocessor(&conf, &err, &global, &pkgs);
