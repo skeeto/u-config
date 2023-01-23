@@ -1,4 +1,5 @@
-// u-config: a tiny, portable pkg-config clone
+// u-config: a small, simple, portable pkg-config clone
+// https://github.com/skeeto/u-config
 // This is free and unencumbered software released into the public domain.
 
 // Fundamental definitions

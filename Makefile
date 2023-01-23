@@ -37,7 +37,10 @@ pkg-config-linux-amd64-debug: linux_amd64_main.c u-config.c
 
 amalgamation: pkg-config.c
 pkg-config.c: u-config.c cmdline.c win32_main.c
-	sed >$@ '/^#include "/d' u-config.c cmdline.c win32_main.c
+	awk 'n{print"";n=0} NR==3{printf"%s\n%s\n",cc,cl} !/^#i.*"/{print}' \
+	    cc='//   $$ cc -nostartfiles -o pkg-config.exe pkg-config.c' \
+	    cl='//   $$ cl pkg-config.c' \
+	    >$@ u-config.c n=1 cmdline.c n=1 win32_main.c
 
 tests.exe: test_main.c u-config.c
 	$(CROSS)$(CC) -g3 -o $@ test_main.c \
