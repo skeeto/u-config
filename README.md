@@ -173,7 +173,7 @@ intended to be run under a debugger:
 
 For MSVC with run-time checks:
 
-    $ cl /Z7 /DDEBUG /W4 /RTScsu PLATFORM_main.c
+    $ cl /Z7 /DDEBUG /W4 /RTCcsu PLATFORM_main.c
 
 ### Test suite
 
@@ -186,7 +186,7 @@ configuration in the Makefile (set `EXE=.exe` on Windows):
 
 For MSVC:
 
-    $ cl /Z7 /W4 /RTScsu test_main.c
+    $ cl /Z7 /W4 /RTCcsu test_main.c
 
 ### Fuzz testing
 
