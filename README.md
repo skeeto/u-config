@@ -5,12 +5,12 @@ primarily to support [w64devkit][] and Windows. It was born of frustration
 with pkg-config and [pkgconf][]. Key features:
 
 * A fraction of the size while retaining the core, user-level features of
-  pkg-config.
+  pkg-config and pkgconf.
 
 * Windows as a first-class supported platform.
 
 * Highly portable to any machine. Can be built without libc, which is
-  handy for bootstrapping
+  handy for bootstrapping.
 
 * Trivial, fast build. No messing around with GNU Autotools, or any build
   system for that matter.
@@ -20,18 +20,15 @@ and so **u-config is probably only useful to distribution maintainers**.
 
 As noted, u-config focuses on *user-level* features but deliberately lacks
 *developer-level* features. The goal is to **support existing pkg-config
-based builds, not make more of them**. Further, if a pkg-config feature
-works incorrectly, such as its attempted removal of repeat compiler
-arguments, that feature is omitted since it's apparently unnecessary. In
-summary:
+based builds, not make more of them**. In summary:
 
 * Omits most `.pc` debugging features (`--print-…`)
 * No special handling of "uninstalled" packages, and no attendant knobs
 * Skips checks unimplemented by pkg-config (i.e. `Conflicts:`)
-* Omits clunky redundant features (`--exists`, `--errors-to-stdout`, etc.)
+* Omits clunky redundant features (`--errors-to-stdout`, etc.)
 * Less strict `.pc` syntax
 
-It still supports the import pkg-config run-time environment variables:
+It still supports the important pkg-config run-time environment variables:
 
 * `PKG_CONFIG_PATH`
 * `PKG_CONFIG_LIBDIR`
@@ -44,22 +41,31 @@ pkg-config's idiosyncratic argument parsing — positional arguments are
 concatenated then retokenzied — and its undocumented `.pc` quote and
 backslash syntax.
 
-The `--newlines` flag is unique to u-config. It separates arguments by
-line feeds instead of spaces, which is useful in certain cases like the
-fish shell or when manually examining output.
+## Features unique to u-config
+
+* `--newlines`: separates arguments by line feeds instead of spaces, which
+  is sometimes useful like in the fish shell or when manually examining
+  output.
+
+* Handles spaces in `prefix`: Especially important on Windows where spaces
+  in paths are common. Libraries will work correctly even when installed
+  under such a path. (Note: Despite popular belief, and the examples in
+  its own documentation, *pkg-config was never designed for use in command
+  substitution*. It was designed for `eval`, and spaces in `prefix` will
+  require implicit or explicit `eval`.)
 
 ## Build
 
-u-config compiles as one translation unit: no build system required, just
-a C toolchain. Choose an appropriate platform layer (`*_main.c`) for your
-target and compile only that source file. The "generic" platform is libc
-so it works everywhere, but inherits the target's libc limitations (path
-limitations, no automatic self-configuration, etc.).
+u-config compiles as one translation unit. Choose an appropriate platform
+layer (`*_main.c`) for your target then invoke your C compiler only that
+source file. The "generic" platform is libc so it works everywhere, but
+inherits the target's libc limitations (restricted path and environment
+variable access, no automatic self-configuration, etc.).
 
     $ cc -Os -o pkg-config generic_main.c
 
 However, one of core goals is to be a reliable, native pkg-config for
-Windows, so it gets a dedicated platform layer. This layer understands
+Windows, so it has a dedicated platform layer. This layer understands
 Unicode paths and environment variables — though keep in mind that it's
 probably interacting with tools that do not. It outputs arguments encoded
 in UTF-8 regardless of the system code page. Do not link a C runtime (CRT)
@@ -92,10 +98,10 @@ drop-in replacement for it.
 
 ### Generic configuration options
 
-The "generic" platform has three compile time configuration parameters.
-Each must be formatted as a C string. Relative paths will be relative to
-the run-time working directory, not the installation prefix, which is
-usually not useful.
+The "generic" platform has several compile time configuration parameters.
+Each must be formatted as a C string with quotes. Relative paths will be
+relative to the run-time working directory, not the installation prefix,
+which is usually not useful.
 
 * `PKG_CONFIG_PATH`: Like the run-time environment variable, but places
   these additional paths ahead of the standard search locations. If the
@@ -112,6 +118,7 @@ usually not useful.
 
 * `PKG_CONFIG_DEFINE_PREFIX`: Sets the default for `--define-prefix` /
   `--dont-define-prefix`. Defaults to true on Windows, false otherwise.
+  You probably want the default.
 
 * `PKG_CONFIG_SYSTEM_INCLUDE_PATH`: Like the run-time environment variable
   but sets the static default.
@@ -121,17 +128,14 @@ usually not useful.
 
 Examples:
 
-    $ gcc -DPKG_CONFIG_PREFIX="\"$HOME/.local\"" ...
-    $ gcc -DPKG_CONFIG_PATH="\"$HOME/.local/lib/pkgconfig\"" ...
-
-While both are supported, the u-config prefers slashes over backslashes in
-order to reduce issues involving backslash as a shell metacharacter.
+    $ cc -DPKG_CONFIG_PREFIX="\"$HOME/.local\"" ...
+    $ cc -DPKG_CONFIG_PATH="\"$HOME/.local/lib/pkgconfig\"" ...
 
 ### Windows configuration options
 
 The "win32" platform always searches relative to `pkg-config.exe` since
 it's essentially the only useful behavior. It is rare for anything aside
-from system components to be compile-time-known absolute paths. The
+from system components to be at compile-time-known absolute paths. The
 default configuration assumes pkg-config resides in `bin/` adjacent to
 `lib/` and `share/` — a typical sysroot.
 
@@ -142,13 +146,17 @@ default configuration assumes pkg-config resides in `bin/` adjacent to
 
 Example, if just outside a sysroot which identifies the architecture:
 
-    $ gcc -DPKG_CONFIG_PREFIX="\"/$(gcc -dumpmachine)\"" ...
+    $ gcc -DPKG_CONFIG_PREFIX=\"/$(gcc -dumpmachine)\" ...
+
+While both are supported, u-config prefers slashes over backslashes in
+order to reduce issues involving backslash as a shell metacharacter.
 
 ### x86-64 Linux configuration options
 
-Do not link the `linux_amd64_main.c` platform with libc. It compiles to a
-~20kB static x86-64 executable. It supports these configuration macros
-with the same behavior as the generic platform.
+`linux_amd64_main.c` makes direct Linux system calls using assembly and
+does not require libc. It compiles to a ~20kB static executable that will
+work on any x86-64 Linux host. It supports these configuration macros with
+the same behavior as the generic platform.
 
 * `PKG_CONFIG_LIBDIR`
 * `PKG_CONFIG_SYSTEM_INCLUDE_PATH`
@@ -156,11 +164,12 @@ with the same behavior as the generic platform.
 
 ### Debugging
 
-The `DEBUG` macro enables assertions. Suggested debug build:
+The `DEBUG` macro enables assertions. Suggested debug build, which is
+intended to be run under a debugger:
 
-    $ gcc -g3 -DDEBUG -Wall -Wextra -Wconversion -Wno-sign-conversion \
-          -fsanitize=undefined -fsanitize-undefined-trap-on-error \
-          PLATFORM_main.c
+    $ cc -g3 -DDEBUG -Wall -Wextra -Wconversion -Wno-sign-conversion \
+         -fsanitize=undefined -fsanitize-undefined-trap-on-error \
+         PLATFORM_main.c
 
 For MSVC with run-time checks:
 
