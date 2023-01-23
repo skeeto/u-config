@@ -56,4 +56,5 @@ clean:
 	rm -f pkg-config.exe pkg-config-debug.exe \
 	      pkg-config pkg-config-debug \
 	      pkg-config-linux-amd64 pkg-config-linux-amd64-debug \
-	      pkg-config.c
+	      pkg-config.c \
+	      tests.exe tests
