@@ -207,6 +207,29 @@ static void test_private_transitive(void)
     ASSERT(equals(context.output, S("-la -lx -lb -lc\n")));
 }
 
+static void test_lol(void)
+{
+    Config conf = newtest_("a billion laughs");
+    newfile_(&conf, S("lol.pc"), S(
+        "v9=lol\n"
+        "v8=${v9}${v9}${v9}${v9}${v9}${v9}${v9}${v9}${v9}${v9}\n"
+        "v7=${v8}${v8}${v8}${v8}${v8}${v8}${v8}${v8}${v8}${v8}\n"
+        "v6=${v7}${v7}${v7}${v7}${v7}${v7}${v7}${v7}${v7}${v7}\n"
+        "v5=${v6}${v6}${v6}${v6}${v6}${v6}${v6}${v6}${v6}${v6}\n"
+        "v4=${v5}${v5}${v5}${v5}${v5}${v5}${v5}${v5}${v5}${v5}\n"
+        "v3=${v4}${v4}${v4}${v4}${v4}${v4}${v4}${v4}${v4}${v4}\n"
+        "v2=${v3}${v3}${v3}${v3}${v3}${v3}${v3}${v3}${v3}${v3}\n"
+        "v1=${v2}${v2}${v2}${v2}${v2}${v2}${v2}${v2}${v2}${v2}\n"
+        "v0=${v1}${v1}${v1}${v1}${v1}${v1}${v1}${v1}${v1}${v1}\n"
+        "Name:\n"
+        "Version: ${v0}\n"
+        "Description:\n"
+    ));
+    SHOULDFAIL {
+        run(conf, S("--modversion"), S("lol.pc"), E);
+    }
+}
+
 static Arena newarena_(Size cap)
 {
     Arena arena = {0};
@@ -223,6 +246,7 @@ int main(void)
     test_modversion();
     test_badversion();
     test_private_transitive();
+    test_lol();
 
     free(context.arena.mem.s);  // to satisfy leak checkers
     puts("all tests pass");
