@@ -533,7 +533,7 @@ static Str *fieldbyname(Pkg *p, Str name)
     static const Byte fields[] =
         "Name" "Description" "URL" "Version" "Requires.private"
         "Conflicts" "Libs.private" "Cflags";
-    for (Size i = 0; i < COUNTOF(offs); i++) {
+    for (int i = 0; i < COUNTOF(offs); i++) {
         Str field = {(Byte *)fields+offs[i], lens[i]};
         if (equals(field, name)) {
             return fieldbyid(p, i);
