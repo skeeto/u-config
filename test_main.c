@@ -15,6 +15,13 @@
 #define SHOULDFAIL \
     for (int r = setjmp(context.exit); !r; TRAP)
 #define PCHDR "Name:\n" "Version:\n" "Description:\n"
+#define EXPECT(w) \
+    if (!equals(context.output, S(w))) { \
+        printf("EXPECT: %s", w); \
+        printf("OUTPUT: %.*s", (int)context.output.len, context.output.s); \
+        fflush(stdout); \
+        TRAP; \
+    }
 
 static struct {
     jmp_buf exit;
@@ -129,7 +136,7 @@ static void test_modversion(void)
             "Description:\n"
         ));
         run(conf, S("--modversion"), S("direct"), S("indirect"), E);
-        ASSERT(equals(context.output, S("1.2.3\n12.345.6789\n")));
+        EXPECT("1.2.3\n12.345.6789\n");
     }
 }
 
@@ -184,17 +191,17 @@ static void test_maximum_traverse_depth(void)
     SHOULDPASS {
         run(conf, S("--maximum-traverse-depth=1"), S("--cflags"), S("a"), E);
     }
-    ASSERT(equals(context.output, S("-Da\n")));
+    EXPECT("-Da\n");
 
     SHOULDPASS {
         run(conf, S("--maximum-traverse-depth=2"), S("--cflags"), S("a"), E);
     }
-    ASSERT(equals(context.output, S("-Da -Db\n")));
+    EXPECT("-Da -Db\n");
 
     SHOULDPASS {
         run(conf, S("--maximum-traverse-depth=3"), S("--cflags"), S("a"), E);
     }
-    ASSERT(equals(context.output, S("-Da -Db -Dc\n")));
+    EXPECT("-Da -Db -Dc\n");
 }
 
 static void test_private_transitive(void)
@@ -226,12 +233,12 @@ static void test_private_transitive(void)
     SHOULDPASS {
         run(conf, S("--libs"), S("a"), E);
     }
-    ASSERT(equals(context.output, S("-la -lx\n")));
+    EXPECT("-la -lx\n");
 
     SHOULDPASS {
         run(conf, S("--libs"), S("--static"), S("a"), E);
     }
-    ASSERT(equals(context.output, S("-la -lx -lb -lc\n")));
+    EXPECT("-la -lx -lb -lc\n");
 }
 
 static void test_lol(void)
