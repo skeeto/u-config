@@ -14,6 +14,7 @@
     for (int r = setjmp(context.exit); !r || (r>0 && (TRAP, 0)); r = -1)
 #define SHOULDFAIL \
     for (int r = setjmp(context.exit); !r; TRAP)
+#define PCHDR "Name:\n" "Version:\n" "Description:\n"
 
 static struct {
     jmp_buf exit;
@@ -168,30 +169,22 @@ static void test_private_transitive(void)
     // Expect: --libs should not include c without --static
     Config conf = newtest_("private transitive");
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
-        "Name:\n"
-        "Version:\n"
-        "Description:\n"
+        PCHDR
         "Requires: x\n"
         "Requires.private: b\n"
         "Libs: -la\n"
     ));
     newfile_(&conf, S("/usr/lib/pkgconfig/x.pc"), S(
-        "Name:\n"
-        "Version:\n"
-        "Description:\n"
+        PCHDR
         "Libs: -lx\n"
     ));
     newfile_(&conf, S("/usr/lib/pkgconfig/b.pc"), S(
-        "Name:\n"
-        "Version:\n"
-        "Description:\n"
+        PCHDR
         "Requires: c\n"
         "Libs: -lb\n"
     ));
     newfile_(&conf, S("/usr/lib/pkgconfig/c.pc"), S(
-        "Name:\n"
-        "Version:\n"
-        "Description:\n"
+        PCHDR
         "Requires.private: b\n"
         "Libs: -lc\n"
     ));
