@@ -18,7 +18,7 @@ pkg-config-debug.exe: win32_main.c cmdline.c u-config.c
 # Configure using the system's pkg-config search path
 pkg-config: generic_main.c u-config.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ generic_main.c \
-	  -DPKG_CONFIG_LIBDIR="\"$$(pkg-config --variable pc_path pkg-config)\""
+	    -DPKG_CONFIG_LIBDIR="\"$$(pkg-config --variable pc_path pkg-config)\""
 
 pkg-config-debug: generic_main.c u-config.c
 	$(CC) -g3 -DDEBUG -Wall -Wextra -Wconversion -Wno-sign-conversion \
@@ -44,13 +44,15 @@ pkg-config.c: u-config.c cmdline.c win32_main.c
 
 tests.exe: test_main.c u-config.c
 	$(CROSS)$(CC) -g3 -o $@ test_main.c \
-		-Wall -Wextra -Wconversion -Wno-sign-conversion -Wno-clobbered \
-	   -fsanitize=undefined -fsanitize-undefined-trap-on-error \
+	    -Wall -Wextra -Wconversion -Wno-sign-conversion \
+	    -Wno-clobbered -Wno-for-loop-analysis -Wno-unknown-warning-option \
+	    -fsanitize=undefined -fsanitize-undefined-trap-on-error
 
 tests: test_main.c u-config.c
 	$(CC) -g3 -o $@ test_main.c \
-		-Wall -Wextra -Wconversion -Wno-sign-conversion -Wno-clobbered \
-		-fsanitize=address,undefined
+	    -Wall -Wextra -Wconversion -Wno-sign-conversion \
+	    -Wno-clobbered -Wno-for-loop-analysis -Wno-unknown-warning-option \
+	    -fsanitize=address,undefined
 
 check: tests$(EXE)
 	./tests
