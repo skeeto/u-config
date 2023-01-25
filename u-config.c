@@ -475,7 +475,7 @@ typedef struct {
 // Return a pointer to the binding so that the caller can choose to fill
 // it. The arena is optional. If given, the binding will be created and
 // set to a null string. An unallocated, zero-initialized environment is
-// valid and will automatically populate it as needed.
+// a valid empty environment.
 static Str *insert(Arena *a, Env *e, Str name)
 {
     Var *var = treapinsert(a, &e->vars, name, SIZEOF(Var));
@@ -825,8 +825,8 @@ static void usage(Out *out)
     "  --libs, --libs-only-L, --libs-only-l, --libs-only-other\n"
     "  --maximum-traverse-depth=N\n"
     "  --modversion\n"
-    "  --newlines\n"
     "  --msvc-syntax\n"
+    "  --newlines\n"
     "  --static\n"
     "  --validate\n"
     "  --with-path=PATH\n"
