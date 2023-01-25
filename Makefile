@@ -55,7 +55,7 @@ tests: test_main.c u-config.c
 	    -fsanitize=address,undefined
 
 check: tests$(EXE)
-	./tests
+	./tests$(EXE)
 
 clean:
 	rm -f pkg-config.exe pkg-config-debug.exe \
