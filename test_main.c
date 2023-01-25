@@ -275,6 +275,49 @@ static void test_revealed_transitive(void)
     EXPECT("-la -lx\n");
 }
 
+static void test_windows(void)
+{
+    // Tests the ';' delimiter, that the prefix is overridden, and that
+    // prefixes containing spaces are properly quoted. The fixed path
+    // would be Win32 platform's fixed path if the binary was located in
+    // "$HOME/bin".
+    Config conf = newtest_("windows");
+    conf.fixedpath = S(
+        "C:/Documents and Settings/John Falstaff/lib/pkgconfig;"
+        "C:/Documents and Settings/John Falstaff/share/pkgconfig"
+    );
+    conf.envpath = S(
+        "C:/Program Files/Example/lib/pkgconfig;"
+        "C:/Program Files/SDL2/x86_64-w64-mingw32/lib/pkgconfig"
+    );
+    conf.define_prefix = 1;
+    conf.delim = ';';
+    newfile_(&conf, S(
+        "C:/Program Files/SDL2/x86_64-w64-mingw32/lib/pkgconfig/sdl2.pc"
+    ), S(
+        "prefix=/opt/local/x86_64-w64-mingw32\n"
+        "exec_prefix=${prefix}\n"
+        "libdir=${exec_prefix}/lib\n"
+        "includedir=${prefix}/include\n"
+        "Name: sdl2\n"
+        "Description: Simple DirectMedia Layer\n"
+        "Version: 2.26.2\n"
+        "Libs: -L${libdir} -lmingw32 -lSDL2main -lSDL2 -mwindows\n"
+        "Cflags: -I${includedir} -I${includedir}/SDL2  -Dmain=SDL_main\n"
+    ));
+
+    SHOULDPASS {
+        run(conf, S("--cflags"), S("--libs"), S("sdl2"), E);
+    }
+    EXPECT(
+        "-IC:/Program\\ Files/SDL2/x86_64-w64-mingw32/include "
+        "-IC:/Program\\ Files/SDL2/x86_64-w64-mingw32/include/SDL2 "
+        "-Dmain=SDL_main "
+        "-LC:/Program\\ Files/SDL2/x86_64-w64-mingw32/lib "
+        "-lmingw32 -lSDL2main -lSDL2 -mwindows\n"
+    );
+}
+
 static void test_lol(void)
 {
     Config conf = newtest_("a billion laughs");
@@ -316,6 +359,7 @@ int main(void)
     test_maximum_traverse_depth();
     test_private_transitive();
     test_revealed_transitive();
+    test_windows();
     test_lol();
 
     free(context.arena.mem.s);  // to satisfy leak checkers
