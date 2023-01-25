@@ -37,6 +37,19 @@ __asm(
     "   syscall\n"
 );
 
+__attribute__((section(".text.memset")))
+void *memset(void *d, int c, unsigned long n)
+{
+    void *r = d;
+    __asm volatile (
+        "rep stosb"
+        : "=D"(d), "=a"(c), "=c"(n)
+        : "0"(d), "1"(c), "2"(n)
+        : "memory"
+    );
+    return r;
+}
+
 __attribute__((section(".text.memcpy")))
 void *memcpy(void *d, const void *s, unsigned long n)
 {
