@@ -320,6 +320,50 @@ static void test_windows(void)
     );
 }
 
+static void outlong_(Out *out, long x)
+{
+    Byte buf[32];
+    Byte *e = buf + SIZEOF(buf);
+    Byte *p = e;
+    do {
+        *--p = (Byte)(x%10 + '0');
+    } while (x /= 10);
+    outstr(out, fromptrs(p, e));
+}
+
+static void test_manyvars(void)
+{
+    // Stresses the treap-backed package environment
+    Config conf = newtest_("many variables");
+
+    // Write an on-the-fly .pc into the virtual file system
+    Out pc = newmembuf(&conf.arena);
+    outstr(&pc, S(PCHDR));
+    long nvars = 10000;
+    for (long i = 0; i < nvars; i++) {
+        outstr(&pc, S("v"));
+        outlong_(&pc, i);
+        outbyte(&pc, '=');
+        outbyte(&pc, 'A' + (Byte)(i%26));
+        outbyte(&pc, '\n');
+    }
+    newfile_(&conf, S("manyvars.pc"), finalize(&pc));
+
+    // Probe some of the variables to check that they work
+    for (long i = 0; i < nvars; i += 197) {
+        Config temp = conf;
+        Out mem = newmembuf(&temp.arena);
+        outbyte(&mem, 'v');
+        outlong_(&mem, i);
+        Str var = finalize(&mem);
+        SHOULDPASS {
+            run(temp, S("manyvars.pc"), S("--variable"), var, E);
+        }
+        Byte expect[] = {'A' + (Byte)(i%26), '\n', 0};
+        EXPECT(expect);
+    }
+}
+
 static void test_lol(void)
 {
     Config conf = newtest_("a billion laughs");
@@ -362,6 +406,7 @@ int main(void)
     test_private_transitive();
     test_revealed_transitive();
     test_windows();
+    test_manyvars();
     test_lol();
 
     free(context.arena.mem.s);  // to satisfy leak checkers
