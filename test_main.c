@@ -30,10 +30,13 @@ static struct {
     Str output;
     Str outavail;
     Env filesystem;
+    Bool active;
 } context;
 
 static void os_fail(void)
 {
+    ASSERT(context.active);
+    context.active = 0;
     longjmp(context.exit, 1);
 }
 
@@ -107,7 +110,10 @@ static void run(Config conf, ...)
     context.output = takehead(context.outbuf, 0);
     context.outavail = context.outbuf;
     shredfree(&conf.arena);
+    context.active = 1;
     appmain(conf);
+    ASSERT(context.active);
+    context.active = 0;
 }
 
 static void test_noargs(void)
