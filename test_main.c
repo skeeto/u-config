@@ -26,6 +26,7 @@
 static struct {
     jmp_buf exit;
     Arena arena;
+    Str outbuf;
     Str output;
     Str outavail;
     Env filesystem;
@@ -68,7 +69,7 @@ static Config newtest_(char *name)
     printf("TEST: %s\n", name);
 
     context.arena.off = 0;
-    context.outavail = newstr(&context.arena, 1<<10);
+    context.outbuf = newstr(&context.arena, 1<<10);
     context.filesystem = (Env){0};
 
     Config conf = {0};
@@ -103,7 +104,8 @@ static void run(Config conf, ...)
     }
     va_end(ap);
 
-    context.output = takehead(context.outavail, 0);
+    context.output = takehead(context.outbuf, 0);
+    context.outavail = context.outbuf;
     shredfree(&conf.arena);
     appmain(conf);
 }
