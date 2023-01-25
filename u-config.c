@@ -1606,11 +1606,13 @@ static void insertsyspath(OutConfig *conf, Str path, Byte delim, Byte flag)
         Str syspath = newstr(&snapshot, prefix.len+dir.len);
         copy(copy(syspath, prefix), dir);
         // NOTE(NRK): Technically, the path doesn't need to follow the flag
-        // immediately (e.g `-I /usr/include`). But I have not seen a single
-        // pc file that does this.
+        // immediately e.g `-I /usr/include` (notice the space between -I and
+        // the include dir!).
         //
-        // In fact, `pkgconf` also fails to recognize `-I /usr/include` as
-        // a system include path! So this should be fine in practice.
+        // But I have not seen a single pc file that does this and so we're not
+        // handling this edge-case. As a proof that this should be fine in
+        // practice, `pkgconf` which is used by many distros, also doesn't
+        // handle it.
         if (insertstr(&snapshot, &conf->seen, syspath)) {
             *conf->arena = snapshot;
         }
