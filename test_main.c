@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define E (Str){0, 0}
+#define E S("")
 #define SHOULDPASS \
     for (int r = setjmp(context.exit); !r || (r>0 && (TRAP, 0)); r = -1)
 #define SHOULDFAIL \
@@ -96,7 +96,7 @@ static void run(Config conf, ...)
     va_start(ap, conf);
     for (conf.nargs = 0;; conf.nargs++) {
         Str arg = va_arg(ap, Str);
-        if (!arg.s) {
+        if (!arg.len) {
             break;
         }
     }
