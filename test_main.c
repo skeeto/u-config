@@ -381,25 +381,30 @@ static void test_manyvars(void)
 {
     // Stresses the treap-backed package environment
     Config conf = newtest_("many variables");
-
-    // Write an on-the-fly .pc into the virtual file system
-    Out pc = newmembuf(&conf.arena);
-    outstr(&pc, S(PCHDR));
+    newfile_(&conf, S("manyvars.pc"), S(""));  // allocate empty file
     long nvars = 10000;
-    for (long i = 0; i < nvars; i++) {
-        outstr(&pc, S("v"));
-        outlong_(&pc, i);
-        outbyte(&pc, '=');
-        outbyte(&pc, 'A' + (Byte)(i%26));
-        outbyte(&pc, '\n');
-    }
-    newfile_(&conf, S("manyvars.pc"), finalize(&pc));
 
-    // Probe some of the variables to check that they work
     for (long i = 0; i < nvars; i += 197) {
         Config temp = conf;
+        Byte prefix = 'a' + (Byte)(i%26);
+
+        // Write a fresh .pc file into the virtual "manyvars.pc" with a
+        // rotated variable order and prefix to perturb the package Env.
+        Out pc = newmembuf(&temp.arena);
+        outstr(&pc, S(PCHDR));
+        for (long v = 0; v < nvars; v++) {
+            long vnum = (v + i) % nvars;
+            outbyte(&pc, prefix);
+            outlong_(&pc, vnum);
+            outbyte(&pc, '=');
+            outbyte(&pc, 'A' + (Byte)(vnum%26));
+            outbyte(&pc, '\n');
+        }
+        newfile_(&temp, S("manyvars.pc"), finalize(&pc));  // overwrite
+
+        // Probe a variable to test the environment
         Out mem = newmembuf(&temp.arena);
-        outbyte(&mem, 'v');
+        outbyte(&mem, prefix);
         outlong_(&mem, i);
         Str var = finalize(&mem);
         SHOULDPASS {
