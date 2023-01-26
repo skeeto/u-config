@@ -831,13 +831,13 @@ static Str getargopt(Out *err, OptionParser *p, Str option)
 static void usage(Out *out)
 {
     static const char usage[] =
-    "u-config " VERSION " https://github.com/skeeto/u-config "
-    "(released into the public domain)\n"
+    "u-config " VERSION " https://github.com/skeeto/u-config\n"
+    "free and unencumbered software released into the public domain\n"
     "usage: pkg-config [OPTIONS...] [PACKAGES...]\n"
     "  --cflags, --cflags-only-I, --cflags-only-other\n"
     "  --define-prefix, --dont-define-prefix\n"
     "  --define-variable=NAME=VALUE, --variable=NAME\n"
-    "  --exists\n"
+    "  --exists, --validate\n"
     "  --keep-system-cflags, --keep-system-libs\n"
     "  --libs, --libs-only-L, --libs-only-l, --libs-only-other\n"
     "  --maximum-traverse-depth=N\n"
@@ -845,9 +845,14 @@ static void usage(Out *out)
     "  --msvc-syntax\n"
     "  --newlines\n"
     "  --static\n"
-    "  --validate\n"
     "  --with-path=PATH\n"
-    "  -h, --help, --version\n";
+    "  -h, --help, --version\n"
+    "environment:\n"
+    "  PKG_CONFIG_PATH\n"
+    "  PKG_CONFIG_LIBDIR\n"
+    "  PKG_CONFIG_TOP_BUILD_DIR\n"
+    "  PKG_CONFIG_SYSTEM_INCLUDE_PATH\n"
+    "  PKG_CONFIG_SYSTEM_LIBRARY_PATH\n";
     outstr(out, S(usage));
 }
 
