@@ -10,34 +10,45 @@ typedef int Size;
 #define Size_MASK ((unsigned)-1)
 #define Size_MAX  ((Size)(Size_MASK>>1) - (ALIGN-1))
 
+#define SIZEOF(x) (Size)(sizeof(x))
+#define ALIGN SIZEOF(void *)
+#define COUNTOF(a) (SIZEOF(a)/SIZEOF(a[0]))
+
 typedef int Bool;
 typedef unsigned char Byte;
 
 #if __GNUC__
-#  define TRAP __builtin_trap()
-#  define NORETURN __attribute__((noreturn))
+  #define TRAP __builtin_trap()
+  #define NORETURN __attribute__((noreturn))
 #elif _MSC_VER
-#  define TRAP __debugbreak()
-#  define NORETURN __declspec(noreturn)
+  #define TRAP __debugbreak()
+  #define NORETURN __declspec(noreturn)
 #else
-#  define TRAP *(volatile int *)0 = 0
-#  define NORETURN
+  #define TRAP *(volatile int *)0 = 0
+  #define NORETURN
 #endif
 
 #ifdef DEBUG
-#  define ASSERT(c) if (!(c)) TRAP
+  #define ASSERT(c) if (!(c)) TRAP
 #else
-#  define ASSERT(c)
+  #define ASSERT(c)
 #endif
-#define SIZEOF(x) (Size)(sizeof(x))
-#define ALIGN SIZEOF(void *)
-#define COUNTOF(a) (SIZEOF(a)/SIZEOF(a[0]))
-#define S(s) (Str){(Byte *)s, SIZEOF(s)-1}
 
 typedef struct {
     Byte *s;
     Size len;
 } Str;
+
+#ifdef __cplusplus
+  #define S(s) makestr((Byte *)s, SIZEOF(s)-1)
+  static inline Str makestr(Byte *s, Size len)
+  {
+      Str r = {s, len};
+      return r;
+  }
+#else
+  #define S(s) (Str){(Byte *)s, SIZEOF(s)-1}
+#endif
 
 typedef struct {
     Str mem;
@@ -145,7 +156,7 @@ static void *allocarray(Arena *a, Size size, Size count)
 
 static Str newstr(Arena *a, Size len)
 {
-    Str r = {alloc(a, len), len};
+    Str r = {(Byte *)alloc(a, len), len};
     return r;
 }
 
@@ -343,7 +354,7 @@ static void *treapinsert(Arena *a, Treap **t, Str key, Size size)
     if (!a) {
         return 0;  // "only browsing, thanks"
     }
-    Treap *node = zalloc(a, size);
+    Treap *node = (Treap *)zalloc(a, size);
     node->key = key;
     node->parent = parent;
     *target = node;
@@ -478,7 +489,7 @@ typedef struct {
 // a valid empty environment.
 static Str *insert(Arena *a, Env *e, Str name)
 {
-    Var *var = treapinsert(a, &e->vars, name, SIZEOF(Var));
+    Var *var = (Var *)treapinsert(a, &e->vars, name, SIZEOF(*var));
     return var ? &var->value : 0;
 }
 
@@ -584,7 +595,7 @@ typedef struct {
 // space in the set for a new package.
 static Pkg *locate(Arena *a, Pkgs *t, Str realname)
 {
-    Pkg *p = treapinsert(a, &t->pkgs, realname, SIZEOF(Pkg));
+    Pkg *p = (Pkg *)treapinsert(a, &t->pkgs, realname, SIZEOF(*p));
     if (!p->realname.s) {
         t->count++;
         p->realname = realname;
@@ -860,7 +871,7 @@ static Search newsearch(Byte delim)
 
 static void appenddir(Arena *a, Search *dirs, Str dir)
 {
-    SearchNode *node = alloc(a, SIZEOF(*node));
+    SearchNode *node = (SearchNode *)alloc(a, SIZEOF(*node));
     node->dir = dir;
     node->next = 0;
     if (dirs->tail) {
@@ -1575,7 +1586,7 @@ typedef struct {
 // Try to insert the string into the set, returning true on success.
 static Bool insertstr(Arena *a, StrSet *set, Str s)
 {
-    StrSetEntry *e = treapinsert(a, &set->set, s, SIZEOF(StrSetEntry));
+    StrSetEntry *e = (StrSetEntry *)treapinsert(a, &set->set, s, SIZEOF(*e));
     if (!e->present) {
         e->present = 1;
         return 1;
@@ -1719,7 +1730,7 @@ static void appmain(Config conf)
     *insert(a, &global, S("pc_sysrootdir")) = S("/");
     *insert(a, &global, S("pc_top_builddir")) = conf.top_builddir;
 
-    Str *args = allocarray(a, SIZEOF(Str), conf.nargs);
+    Str *args = (Str *)allocarray(a, SIZEOF(Str), conf.nargs);
     Size nargs = 0;
 
     for (OptionParser opts = newoptionparser(conf.args, conf.nargs);;) {

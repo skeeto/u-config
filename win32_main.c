@@ -10,16 +10,31 @@
 #endif
 
 #ifdef _MSC_VER
-  #define ENTRYPOINT
+  #ifdef __cplusplus
+    #define EXTERN extern "C"
+  #else
+    #define EXTERN
+  #endif
   #pragma comment(lib, "kernel32.lib")
   #pragma comment(linker, "/subsystem:console")
-  #pragma function(memset)
-  void *memset(void *d, int c, size_t n) { __stosb(d, (BYTE)c, n); return d; }
+  #if _MSC_VER >= 1400
+    #pragma function(memset)
+    void *memset(void *d, int c, size_t n)
+    {
+        __stosb((BYTE *)d, (BYTE)c, n);
+        return d;
+    }
+  #endif
 #elif __GNUC__
-  #define ENTRYPOINT __attribute__((externally_visible))
+  #ifdef __cplusplus
+    #define EXTERN extern "C" __attribute__((externally_visible))
+  #else
+    #define EXTERN __attribute__((externally_visible))
+  #endif
   // NOTE: These functions are required at higher GCC optimization
   // levels. Placing them in their own section allows them to be
   // ommitted via -Wl,--gc-sections when unused.
+  EXTERN
   __attribute__((section(".text.memcpy")))
   void *memcpy(void *d, const void *s, size_t n)
   {
@@ -33,6 +48,7 @@
       );
       return r;
   }
+  EXTERN
   __attribute__((section(".text.strlen")))
   size_t strlen(const char *s)
   {
@@ -51,7 +67,8 @@ static Arena newarena_(void)
     #if DEBUG
     cap = 1<<21;
     #endif
-    arena.mem.s = VirtualAlloc(0, cap, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
+    DWORD type = MEM_COMMIT | MEM_RESERVE;
+    arena.mem.s = (Byte *)VirtualAlloc(0, cap, type, PAGE_READWRITE);
     arena.mem.len = arena.mem.s ? cap : 0;
     shredfree(&arena);
     return arena;
@@ -67,7 +84,7 @@ static Str fromwide_(Arena *a, WCHAR *w, Size wlen)
     return s;
 }
 
-static Str fromenv_(Arena *a, WCHAR *name)
+static Str fromenv_(Arena *a, const WCHAR *name)
 {
     // NOTE: maximum environment variable size is 2**15-1, so this
     // cannot fail if the variable actually exists
@@ -122,7 +139,7 @@ static Str fromcstr_(char *z)
     return s;
 }
 
-ENTRYPOINT
+EXTERN
 int mainCRTStartup(void)
 {
     Config conf = {0};
@@ -135,9 +152,10 @@ int mainCRTStartup(void)
     HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
     error_is_console = GetConsoleMode(err, &dummy);
 
-    char **argv = allocarray(a, SIZEOF(*argv), CMDLINE_ARGV_MAX);
-    conf.nargs = cmdline_to_argv8(GetCommandLineW(), argv) - 1;
-    conf.args = allocarray(a, SIZEOF(Str), conf.nargs);
+    char **argv = (char **)allocarray(a, SIZEOF(*argv), CMDLINE_ARGV_MAX);
+    unsigned short *cmdline = (unsigned short *)GetCommandLineW();
+    conf.nargs = cmdline_to_argv8(cmdline, argv) - 1;
+    conf.args = (Str *)allocarray(a, SIZEOF(Str), conf.nargs);
     for (Size i = 0; i < conf.nargs; i++) {
         conf.args[i] = fromcstr_(argv[i+1]);
     }
@@ -214,7 +232,7 @@ static MapFileResult os_mapfile(Arena *a, Str path)
         return r;
     }
 
-    MapFileResult r = {{p, (Size)lo}, MapFile_OK};
+    MapFileResult r = {{(Byte *)p, (Size)lo}, MapFile_OK};
     return r;
 }
 

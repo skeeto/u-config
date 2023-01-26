@@ -11,8 +11,8 @@ Notable features:
 * Windows as a first-class supported platform.
 
 * Highly portable to any machine. Supports a variety of compilers and
-  operating systems, ancient and new. Can be built without libc, which is
-  handy for bootstrapping.
+  operating systems, ancient and new. Polyglot C and C++. Can be built
+  without libc, which is handy for bootstrapping.
 
 * Trivial, fast build. No messing around with GNU Autotools, or any build
   system for that matter.
@@ -78,6 +78,10 @@ in this configuration.
 Or with MSVC (automatically omits a CRT):
 
     $ cl /O2 /Fe:pkg-config win32_main.c
+
+With pre-2015 MSVC, compile as C++:
+
+    $ cl /TP /O2 /Fe:pkg-config win32_main.c
 
 As a convenience, the Makefile provides a more aggressively optimized GCC
 build configuration.

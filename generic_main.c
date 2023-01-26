@@ -65,7 +65,7 @@ static Arena newarena_(void)
     #endif
 
     Arena arena = {0};
-    arena.mem.s = malloc(cap);
+    arena.mem.s = (Byte *)malloc(cap);
     arena.mem.len = arena.mem.s ? cap : 0;
     shredfree(&arena);
     return arena;
@@ -82,7 +82,7 @@ int main(int argc, char **argv)
         argc--;
         argv++;
     }
-    conf.args = allocarray(&conf.arena, SIZEOF(Str), argc);
+    conf.args = (Str *)allocarray(&conf.arena, SIZEOF(Str), argc);
     conf.nargs = argc;
     for (int i = 0; i < argc; i++) {
         conf.args[i] = fromcstr_(argv[i]);

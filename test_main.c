@@ -103,7 +103,7 @@ static void run(Config conf, ...)
     }
     va_end(ap);
 
-    conf.args = allocarray(&conf.arena, SIZEOF(Str), conf.nargs);
+    conf.args = (Str *)allocarray(&conf.arena, SIZEOF(Str), conf.nargs);
     va_start(ap, conf);
     for (Size i = 0; i < conf.nargs; i++) {
         conf.args[i] = va_arg(ap, Str);
@@ -387,7 +387,7 @@ static void test_manyvars(void)
 
     for (long i = 0; i < nvars; i += 197) {
         Config temp = conf;
-        Byte prefix = 'a' + (Byte)(i%26);
+        Byte prefix = (Byte)('a' + i%26);
 
         // Write a fresh .pc file into the virtual "manyvars.pc" with a
         // rotated variable order and prefix to perturb the package Env.
@@ -411,7 +411,7 @@ static void test_manyvars(void)
         SHOULDPASS {
             run(temp, S("manyvars.pc"), S("--variable"), var, E);
         }
-        Byte expect[] = {'A' + (Byte)(i%26), '\n', 0};
+        Byte expect[] = {(Byte)('A' + i%26), '\n', 0};
         EXPECT(expect);
     }
 }
@@ -442,7 +442,7 @@ static void test_lol(void)
 static Arena newarena_(Size cap)
 {
     Arena arena = {0};
-    arena.mem.s = malloc(cap);
+    arena.mem.s = (Byte *)malloc(cap);
     arena.mem.len = arena.mem.s ? cap : 0;
     return arena;
 }
