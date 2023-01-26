@@ -67,9 +67,9 @@ static void os_write(int fd, Str s)
     }
 }
 
-static Config newtest_(char *name)
+static Config newtest_(Str name)
 {
-    printf("TEST: %s\n", name);
+    printf("TEST: %.*s\n", (int)name.len, (char *)name.s);
 
     context.arena.off = 0;
     context.outbuf = newstr(&context.arena, 1<<10);
@@ -121,7 +121,7 @@ static void run(Config conf, ...)
 static void test_noargs(void)
 {
     // NOTE: this is mainly a sanity check of the test system itself
-    Config conf = newtest_("no arguments");
+    Config conf = newtest_(S("no arguments"));
     SHOULDFAIL {
         run(conf, E);
     }
@@ -129,7 +129,7 @@ static void test_noargs(void)
 
 static void test_modversion(void)
 {
-    Config conf = newtest_("--modversion");
+    Config conf = newtest_(S("--modversion"));
     SHOULDPASS {
         newfile_(&conf, S("/usr/lib/pkgconfig/direct.pc"), S(
             "Name:\n"
@@ -152,7 +152,7 @@ static void test_modversion(void)
 
 static void test_badversion(void)
 {
-    Config conf = newtest_("version checks");
+    Config conf = newtest_(S("version checks"));
     newfile_(&conf, S("/usr/lib/pkgconfig/test.pc"), S(
         "Name:\n"
         "Version: 1.2.3\n"
@@ -182,7 +182,7 @@ static void test_badversion(void)
 
 static void test_maximum_traverse_depth(void)
 {
-    Config conf = newtest_("--maximum-traverse-depth");
+    Config conf = newtest_(S("--maximum-traverse-depth"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
         "Requires: b\n"
@@ -218,7 +218,7 @@ static void test_private_transitive(void)
 {
     // Scenario: a privately requires b which publicly requires c
     // Expect: --libs should not include c without --static
-    Config conf = newtest_("private transitive");
+    Config conf = newtest_(S("private transitive"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
         "Requires: x\n"
@@ -259,7 +259,7 @@ static void test_revealed_transitive(void)
     // The trouble is that x is initially loaded private. However, when
     // laoding b it should become public, and so must be revisited in
     // traversal and marked as such.
-    Config conf = newtest_("revealed transitive");
+    Config conf = newtest_(S("revealed transitive"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
         "Requires.private: b\n"
@@ -287,7 +287,7 @@ static void test_revealed_transitive(void)
 
 static void test_syspaths(void)
 {
-    Config conf = newtest_("exclude syspaths");
+    Config conf = newtest_(S("exclude syspaths"));
     newfile_(&conf, S("/usr/lib/pkgconfig/example.pc"), S(
         PCHDR
         "prefix=/usr\n"
@@ -306,7 +306,7 @@ static void test_windows(void)
     // prefixes containing spaces are properly quoted. The fixed path
     // would be Win32 platform's fixed path if the binary was located in
     // "$HOME/bin".
-    Config conf = newtest_("windows");
+    Config conf = newtest_(S("windows"));
     conf.fixedpath = S(
         "C:/Documents and Settings/John Falstaff/lib/pkgconfig;"
         "C:/Documents and Settings/John Falstaff/share/pkgconfig"
@@ -380,7 +380,7 @@ static void outlong_(Out *out, long x)
 static void test_manyvars(void)
 {
     // Stresses the treap-backed package environment
-    Config conf = newtest_("many variables");
+    Config conf = newtest_(S("many variables"));
     newfile_(&conf, S("manyvars.pc"), S(""));  // allocate empty file
     long nvars = 10000;
 
@@ -417,7 +417,7 @@ static void test_manyvars(void)
 
 static void test_lol(void)
 {
-    Config conf = newtest_("a billion laughs");
+    Config conf = newtest_(S("a billion laughs"));
     newfile_(&conf, S("lol.pc"), S(
         "v9=lol\n"
         "v8=${v9}${v9}${v9}${v9}${v9}${v9}${v9}${v9}${v9}${v9}\n"
