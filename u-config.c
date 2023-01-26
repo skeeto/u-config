@@ -518,7 +518,7 @@ static Str buildpath(Arena *a, Str dir, Str pc)
     Str sep = S("/");
     Str suffix = Z(".pc");
     Size pathlen = dir.len + sep.len + pc.len + suffix.len;
-    Str path = {alloc(a, pathlen), pathlen};
+    Str path = newstr(a, pathlen);
     Str p = path;
     p = copy(p, dir);
     p = copy(p, sep);
