@@ -78,6 +78,8 @@ static Config newtest_(char *name)
     Config conf = {0};
     conf.arena = context.arena;
     conf.delim = ':';
+    conf.sys_incpath = S("/usr/include");
+    conf.sys_libpath = S("/lib:/usr/lib");
     conf.fixedpath = S("/usr/lib/pkgconfig:/usr/share/pkgconfig");
     return conf;
 }
@@ -283,6 +285,21 @@ static void test_revealed_transitive(void)
     EXPECT("-la -lx\n");
 }
 
+static void test_syspaths(void)
+{
+    Config conf = newtest_("exclude syspaths");
+    newfile_(&conf, S("/usr/lib/pkgconfig/example.pc"), S(
+        PCHDR
+        "prefix=/usr\n"
+        "Cflags: -DEXAMPLE -I${prefix}/include\n"
+        "Libs: -L${prefix}/lib -lexample\n"
+    ));
+    SHOULDPASS {
+        run(conf, S("--cflags"), S("--libs"), S("example"), E);
+    }
+    EXPECT("-DEXAMPLE -lexample\n");
+}
+
 static void test_windows(void)
 {
     // Tests the ';' delimiter, that the prefix is overridden, and that
@@ -298,8 +315,26 @@ static void test_windows(void)
         "C:/Program Files/Example/lib/pkgconfig;"
         "C:/Program Files/SDL2/x86_64-w64-mingw32/lib/pkgconfig"
     );
+    conf.sys_incpath = S(
+        "C:/w64devkit/x86_64-w64-mingw32/include;"
+        "C:/Documents and Settings/John Falstaff/include"
+    );
+    conf.sys_libpath = S(
+        "C:/w64devkit/x86_64-w64-mingw32/lib;"
+        "C:/Documents and Settings/John Falstaff/lib"
+    );
     conf.define_prefix = 1;
     conf.delim = ';';
+    newfile_(&conf, S(
+        "C:/Documents and Settings/John Falstaff/lib/pkgconfig/example.pc"
+    ), S(
+        PCHDR
+        "prefix=/usr\n"
+        "libdir=${prefix}/lib\n"
+        "includedir=${prefix}/include\n"
+        "Libs: -L${libdir} -lexample\n"
+        "Cflags: -I${includedir}\n"
+    ));
     newfile_(&conf, S(
         "C:/Program Files/SDL2/x86_64-w64-mingw32/lib/pkgconfig/sdl2.pc"
     ), S(
@@ -313,6 +348,11 @@ static void test_windows(void)
         "Libs: -L${libdir} -lmingw32 -lSDL2main -lSDL2 -mwindows\n"
         "Cflags: -I${includedir} -I${includedir}/SDL2  -Dmain=SDL_main\n"
     ));
+
+    SHOULDPASS {
+        run(conf, S("--cflags"), S("--libs"), S("example"), E);
+    }
+    EXPECT("-lexample\n");
 
     SHOULDPASS {
         run(conf, S("--cflags"), S("--libs"), S("sdl2"), E);
@@ -411,6 +451,7 @@ int main(void)
     test_maximum_traverse_depth();
     test_private_transitive();
     test_revealed_transitive();
+    test_syspaths();
     test_windows();
     test_manyvars();
     test_lol();

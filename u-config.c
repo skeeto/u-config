@@ -1597,16 +1597,27 @@ static void insertsyspath(OutConfig *conf, Str path, Byte delim, Byte flag)
 {
     Byte flagbuf[] = {'-', flag};
     Str prefix = {flagbuf, SIZEOF(flagbuf)};
+
     while (path.len) {
-        Arena snapshot = *conf->arena;
+        // Allocations are tentative and may be discarded
+        Arena save = *conf->arena;
+
         Cut c = cut(path, delim);
         Str dir = c.head;
         path = c.tail;
         if (!dir.len) {
             continue;
         }
-        Str syspath = newstr(&snapshot, prefix.len+dir.len);
+
+        // Prepend option flag
+        Str syspath = newstr(&save, prefix.len+dir.len);
         copy(copy(syspath, prefix), dir);
+
+        // Process as an argument, as though being printed
+        syspath = maybequote(&save, syspath);
+        DequoteResult dr = dequote(&save, syspath);
+        syspath = dr.arg;
+
         // NOTE(NRK): Technically, the path doesn't need to follow the flag
         // immediately e.g `-I /usr/include` (notice the space between -I and
         // the include dir!).
@@ -1615,8 +1626,8 @@ static void insertsyspath(OutConfig *conf, Str path, Byte delim, Byte flag)
         // handling this edge-case. As a proof that this should be fine in
         // practice, `pkgconf` which is used by many distros, also doesn't
         // handle it.
-        if (insertstr(&snapshot, &conf->seen, syspath)) {
-            *conf->arena = snapshot;
+        if (dr.ok && !dr.tail.len && insertstr(&save, &conf->seen, syspath)) {
+            *conf->arena = save;
         }
     }
 }
