@@ -171,9 +171,12 @@ intended to be run under a debugger:
          -fsanitize=undefined -fsanitize-undefined-trap-on-error \
          PLATFORM_main.c
 
-For MSVC with run-time checks:
+For MSVC with maximum run-time error checks (RTC):
 
     $ cl /Z7 /DDEBUG /W4 /RTCcsu PLATFORM_main.c
+
+RTC and Address Sanitizer (`/fsanitize=address`) are mutually exclusive,
+and the former is more useful for u-config.
 
 ### Test suite
 
