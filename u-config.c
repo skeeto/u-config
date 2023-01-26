@@ -1257,7 +1257,7 @@ typedef enum {
     VersionOp_LTE,
     VersionOp_EQ,
     VersionOp_GTE,
-    VersionOp_GT,
+    VersionOp_GT
 } VersionOp;
 
 static VersionOp parseop(Str s)
@@ -1324,7 +1324,7 @@ static Processor newprocessor(Config *c, Out *err, Env *g, Pkgs *pkgs)
     appendpath(a, &search, c->envpath);
     appendpath(a, &search, c->fixedpath);
     int maxdepth = (unsigned)-1 >> 1;
-    Processor proc = {err, search, g, pkgs, 0, maxdepth, 0, 1, 1};
+    Processor proc = {err, search, g, pkgs, 0, maxdepth, VersionOp_ERR, 1, 1};
     return proc;
 }
 
@@ -1403,7 +1403,7 @@ static void process(Arena *a, Processor *proc, Str arg)
     stack[0].last = proc->last;
     stack[0].depth = 0;
     stack[0].flags = Pkg_DIRECT | Pkg_PUBLIC;
-    stack[0].op = 0;
+    stack[0].op = VersionOp_ERR;
 
     while (top >= 0) {
         ProcState *s = stack + top;
@@ -1435,7 +1435,7 @@ static void process(Arena *a, Processor *proc, Str arg)
                 os_fail();
             }
             s->last = 0;
-            s->op = 0;
+            s->op = VersionOp_ERR;
             continue;
         }
 
@@ -1470,7 +1470,7 @@ static void process(Arena *a, Processor *proc, Str arg)
                     stack[top].last = 0;
                     stack[top].depth = depth;
                     stack[top].flags = (flags & ~Pkg_DIRECT) | flags;
-                    stack[top].op = 0;
+                    stack[top].op = VersionOp_ERR;
                 }
             }
         } else {
@@ -1489,13 +1489,13 @@ static void process(Arena *a, Processor *proc, Str arg)
                 stack[top].last = 0;
                 stack[top].depth = depth;
                 stack[top].flags = 0;
-                stack[top].op = 0;
+                stack[top].op = VersionOp_ERR;
                 top++;
                 stack[top].arg = pkg->requires;
                 stack[top].last = 0;
                 stack[top].depth = depth;
                 stack[top].flags = (flags & ~Pkg_DIRECT) | flags;
-                stack[top].op = 0;
+                stack[top].op = VersionOp_ERR;
             }
         }
         pkg->flags |= flags;
@@ -1517,7 +1517,7 @@ typedef enum {
     Filter_L,
     Filter_l,
     Filter_OTHERC,
-    Filter_OTHERL,
+    Filter_OTHERL
 } Filter;
 
 static Bool filterok(Filter f, Str arg)
