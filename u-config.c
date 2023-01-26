@@ -33,7 +33,6 @@ typedef unsigned char Byte;
 #define ALIGN SIZEOF(void *)
 #define COUNTOF(a) (SIZEOF(a)/SIZEOF(a[0]))
 #define S(s) (Str){(Byte *)s, SIZEOF(s)-1}
-#define Z(s) (Str){(Byte *)s, SIZEOF(s)}
 
 typedef struct {
     Byte *s;
@@ -516,7 +515,7 @@ static Str basename(Str path)
 static Str buildpath(Arena *a, Str dir, Str pc)
 {
     Str sep = S("/");
-    Str suffix = Z(".pc");
+    Str suffix = S(".pc\0");
     Size pathlen = dir.len + sep.len + pc.len + suffix.len;
     Str path = newstr(a, pathlen);
     Str p = path;
