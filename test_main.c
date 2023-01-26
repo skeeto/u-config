@@ -71,9 +71,10 @@ static Config newtest_(Str name)
 {
     printf("TEST: %.*s\n", (int)name.len, (char *)name.s);
 
+    Env empty = {0};
+    context.filesystem = empty;
     context.arena.off = 0;
     context.outbuf = newstr(&context.arena, 1<<10);
-    context.filesystem = (Env){0};
 
     Config conf = {0};
     conf.arena = context.arena;

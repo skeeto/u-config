@@ -930,10 +930,11 @@ static Str readpackage(Arena *a, Out *err, Str path, Str realname)
         );
     }
 
+    Str null = {0};
     MapFileResult m = os_mapfile(a, path);
     switch (m.status) {
     case MapFile_NOTFOUND:
-        return (Str){0, 0};
+        return null;
 
     case MapFile_READERR:
         outstr(err, S("pkg-config: "));
@@ -949,7 +950,7 @@ static Str readpackage(Arena *a, Out *err, Str path, Str realname)
         return m.contents;
     }
     ASSERT(0);
-    return (Str){0, 0};
+    return null;
 }
 
 static void expand(Out *out, Out *err, Env *global, Pkg *p, Str str)
@@ -1286,7 +1287,8 @@ static Str opname(VersionOp op)
     case VersionOp_GT:  return S(">");
     }
     ASSERT(0);
-    return (Str){0, 0};
+    Str null = {0};
+    return null;
 }
 
 static Bool validcompare(VersionOp op, int result)
