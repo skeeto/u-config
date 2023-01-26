@@ -200,7 +200,7 @@ static MapFileResult os_mapfile(Arena *a, Str path)
         return r;
     }
 
-    HANDLE *map = CreateFileMapping(h, 0, PAGE_READONLY, 0, lo, 0);
+    HANDLE map = CreateFileMappingA(h, 0, PAGE_READONLY, 0, lo, 0);
     CloseHandle(h);
     if (!map) {
         MapFileResult r = {.status=MapFile_READERR};
