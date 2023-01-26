@@ -50,10 +50,10 @@ static MapFileResult os_mapfile(Arena *a, Str path)
 
     Str *contents = insert(0, &context.filesystem, path);
     if (!contents) {
-        MapFileResult r = {.status=MapFile_NOTFOUND};
+        MapFileResult r = {{0, 0}, MapFile_NOTFOUND};
         return r;
     }
-    MapFileResult r = {.contents=*contents, .status=MapFile_OK};
+    MapFileResult r = {*contents, MapFile_OK};
     return r;
 }
 

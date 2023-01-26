@@ -169,7 +169,7 @@ static MapFileResult os_mapfile(Arena *a, Str path)
         CP_UTF8, 0, (char *)path.s, path.len, wpath, MAX_PATH
     );
     if (!wlen) {
-        MapFileResult r = {.status=MapFile_NOTFOUND};
+        MapFileResult r = {{0, 0}, MapFile_NOTFOUND};
         return r;
     }
 
@@ -183,34 +183,34 @@ static MapFileResult os_mapfile(Arena *a, Str path)
         0
     );
     if (h == INVALID_HANDLE_VALUE) {
-        MapFileResult r = {.status=MapFile_NOTFOUND};
+        MapFileResult r = {{0, 0}, MapFile_NOTFOUND};
         return r;
     }
 
     DWORD hi, lo = GetFileSize(h, &hi);
     if (hi || lo>Size_MAX) {
         CloseHandle(h);
-        MapFileResult r = {.status=MapFile_READERR};
+        MapFileResult r = {{0, 0}, MapFile_READERR};
         return r;
     } else if (!lo) {
         CloseHandle(h);
         // Cannot map an empty file, so use the arena for a zero-size
         // allocation, distinguishing it from a null string.
-        MapFileResult r = {newstr(a, 0), .status=MapFile_OK};
+        MapFileResult r = {newstr(a, 0), MapFile_OK};
         return r;
     }
 
     HANDLE map = CreateFileMappingA(h, 0, PAGE_READONLY, 0, lo, 0);
     CloseHandle(h);
     if (!map) {
-        MapFileResult r = {.status=MapFile_READERR};
+        MapFileResult r = {{0, 0}, MapFile_READERR};
         return r;
     }
 
     void *p = MapViewOfFile(map, FILE_MAP_READ, 0, 0, lo);
     CloseHandle(map);
     if (!p) {
-        MapFileResult r = {.status=MapFile_READERR};
+        MapFileResult r = {{0, 0}, MapFile_READERR};
         return r;
     }
 

@@ -391,7 +391,8 @@ static Out newoutput(Arena *a, int fd, Size len)
 
 static Out newnullout(void)
 {
-    Out out = {.fd=-1};
+    Out out = {0};
+    out.fd = -1;
     return out;
 }
 
@@ -648,7 +649,9 @@ static ParseResult parsepackage(Arena *a, Str src)
 {
     Byte *p = src.s;
     Byte *e = src.s + src.len;
-    ParseResult result = {.status=Parse_OK, .pkg={.contents=src}};
+    ParseResult result = {0};
+    result.status = Parse_OK;
+    result.pkg.contents = src;
 
     while (p < e) {
         for (; p<e && whitespace(*p); p++) {}
@@ -677,10 +680,9 @@ static ParseResult parsepackage(Arena *a, Str src)
         case '=':
             field = insert(a, &result.pkg.env, name);
             if (field->s) {
-                ParseResult dup = {
-                    .dupname = name,
-                    .status = Parse_DUPVARABLE,
-                };
+                ParseResult dup = {0};
+                dup.dupname = name;
+                dup.status = Parse_DUPVARABLE;
                 return dup;
             }
             break;
@@ -688,10 +690,9 @@ static ParseResult parsepackage(Arena *a, Str src)
         case ':':
             field = fieldbyname(&result.pkg, name);
             if (field && field->s) {
-                ParseResult dup = {
-                    .dupname = name,
-                    .status = Parse_DUPFIELD,
-                };
+                ParseResult dup = {0};
+                dup.dupname = name;
+                dup.status = Parse_DUPFIELD;
                 return dup;
             }
             break;
@@ -782,17 +783,21 @@ typedef struct {
 static OptionResult nextoption(OptionParser *p)
 {
     if (p->index == p->nargs) {
-        OptionResult r = {.ok=0};
+        OptionResult r = {0};
         return r;
     }
 
     Str arg = p->args[p->index++];
     if (arg.len<2 || arg.s[0]!='-') {
-        OptionResult r = {.arg=arg, .ok=1};
+        OptionResult r = {0};
+        r.arg = arg;
+        r.ok = 1;
         return r;
     }
 
-    OptionResult r = {.isoption=1, .ok=1};
+    OptionResult r = {0};
+    r.isoption = 1;
+    r.ok = 1;
     arg = cuthead(arg, 1);
     Cut c = cut(arg, '=');
     if (c.ok) {
@@ -848,7 +853,8 @@ typedef struct {
 
 static Search newsearch(Byte delim)
 {
-    Search r = {.delim=delim};
+    Search r = {0};
+    r.delim = delim;
     return r;
 }
 
