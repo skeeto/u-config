@@ -164,6 +164,14 @@ static MapFileResult os_mapfile(Arena *a, Str path)
     }
     Size size = (Size)stat[6];
 
+    if (!size) {
+        syscall1(SYS_close, fd);
+        // Cannot map an empty file, so use the arena for a zero-size
+        // allocation, distinguishing it from a null string.
+        MapFileResult r = {newstr(a, 0), .status=MapFile_OK};
+        return r;
+    }
+
     unsigned long p = syscall6(SYS_mmap, 0, size, 1, 2, fd, 0);
     syscall1(SYS_close, fd);
     if (p > -4096UL) {

@@ -192,6 +192,12 @@ static MapFileResult os_mapfile(Arena *a, Str path)
         CloseHandle(h);
         MapFileResult r = {.status=MapFile_READERR};
         return r;
+    } else if (!lo) {
+        CloseHandle(h);
+        // Cannot map an empty file, so use the arena for a zero-size
+        // allocation, distinguishing it from a null string.
+        MapFileResult r = {newstr(a, 0), .status=MapFile_OK};
+        return r;
     }
 
     HANDLE *map = CreateFileMapping(h, 0, PAGE_READONLY, 0, lo, 0);
