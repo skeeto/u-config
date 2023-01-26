@@ -1,15 +1,17 @@
 # u-config: a small, simple, portable pkg-config clone
 
-u-config ("*micro*-config") is a tiny implementation of [pkg-config][],
-primarily to support [w64devkit][] and Windows. It was born of frustration
-with pkg-config and [pkgconf][]. Key features:
+u-config ("*micro*-config") is a small, highly portable [pkg-config][] and
+[pkgconf][] clone. It was written primarily for [w64devkit][] and Windows,
+but can also serve as a reliable drop-in replacement on other platforms.
+Notable features:
 
 * A fraction of the size while retaining the core, user-level features of
   pkg-config and pkgconf.
 
 * Windows as a first-class supported platform.
 
-* Highly portable to any machine. Can be built without libc, which is
+* Highly portable to any machine. Supports a variety of compilers and
+  operating systems, ancient and new. Can be built without libc, which is
   handy for bootstrapping.
 
 * Trivial, fast build. No messing around with GNU Autotools, or any build
