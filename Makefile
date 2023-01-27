@@ -42,6 +42,10 @@ pkg-config.c: u-config.c cmdline.c win32_main.c
 	    cl='//   $$ cl pkg-config.c' \
 	    >$@ u-config.c n=1 cmdline.c n=1 win32_main.c
 
+release:
+	version=$$(git describe); prefix=u-config-$${version#v}; \
+	  git archive --prefix=$$prefix/ HEAD | gzip -9 >$$prefix.tar.gz
+
 tests.exe: test_main.c u-config.c
 	$(CROSS)$(CC) -g3 -o $@ test_main.c \
 	    -Wall -Wextra -Wconversion -Wno-sign-conversion \
