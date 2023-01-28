@@ -201,10 +201,8 @@ For MSVC:
 
 `fuzz_main.c` is a platform layer implemented on top of [AFL++][]. Fuzzer
 input is supplied through a virtual file, and it exercises `.pc` parsing,
-variable expansion, and output processing.
-
-    $ afl-clang-fast -fsanitize=address,undefined fuzz_main.c
-    $ afl-fuzz -m32T -i/usr/share/pkgconfig -ofuzzout ./a.out
+variable expansion, and output processing. Its header documents suggested
+usage.
 
 
 [AFL++]: https://github.com/AFLplusplus/AFLplusplus

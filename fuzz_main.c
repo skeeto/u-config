@@ -1,6 +1,7 @@
 // afl fuzz test platform layer for u-config
-// $ afl-clang-fast -fsanitize=address,undefined fuzz_main.c
-// $ afl-fuzz -m32T -i /usr/share/pkgconfig -o fuzzout ./a.out
+// $ afl-clang-fast -fsanitize=undefined -fsanitize-undefined-trap-on-error
+//     fuzz_main.c
+// $ afl-fuzz -i /usr/share/pkgconfig -o fuzzout ./a.out
 #define DEBUG
 #include "u-config.c"
 #include <setjmp.h>
@@ -37,10 +38,11 @@ int main(void)
     __AFL_INIT();
     #endif
 
+    Str args[] = {S("--static"), S("--cflags"), S("--libs"), S("afl")};
     Config conf = {
         .arena = {malloc(1<<16), 1<<16},
-        .args = (Str[]){S("--modversion"), S("--cflags"), S("afl")},
-        .nargs = 3,
+        .args = args,
+        .nargs = COUNTOF(args),
         .fixedpath = S("/usr/lib/pkgconfig"),
     };
 
