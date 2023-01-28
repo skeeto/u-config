@@ -1599,6 +1599,8 @@ static Bool dedupable(Str arg)
     // Do not count "-I" or "-L" with detached argument
     if (arg.len<3 || arg.s[0]!='-') {
         return 0;
+    } else if (equals(arg, S("-pthread"))) {
+        return 1;
     }
     Str flags = S("DILflm");
     for (Size i = 0; i < flags.len; i++) {

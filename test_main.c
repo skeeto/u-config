@@ -320,17 +320,17 @@ static void test_libsorder(void)
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
         "Cflags: -DA -DGL\n"
-        "Libs: -L/opt/lib -mwindows -la -lopengl32\n"
+        "Libs: -L/opt/lib -pthread -mwindows -la -lopengl32\n"
     ));
     newfile_(&conf, S("/usr/lib/pkgconfig/b.pc"), S(
         PCHDR
         "Cflags: -DB -DGL\n"
-        "Libs: -L/opt/lib -mwindows -lb -lopengl32\n"
+        "Libs: -L/opt/lib -pthread -mwindows -lb -lopengl32\n"
     ));
     SHOULDPASS {
         run(conf, S("--cflags"), S("--libs"), S("a b"), E);
     }
-    EXPECT("-DA -DGL -DB -L/opt/lib -mwindows -la -lb -lopengl32\n");
+    EXPECT("-DA -DGL -DB -L/opt/lib -pthread -mwindows -la -lb -lopengl32\n");
 }
 
 static void test_windows(void)
