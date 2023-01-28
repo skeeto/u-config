@@ -299,6 +299,38 @@ static void test_syspaths(void)
         run(conf, S("--cflags"), S("--libs"), S("example"), E);
     }
     EXPECT("-DEXAMPLE -lexample\n");
+    SHOULDPASS {
+        run(conf, S("--cflags"), S("--libs"), S("example"),
+                S("--keep-system-cflags"), E);
+    }
+    EXPECT("-DEXAMPLE -I/usr/include -lexample\n");
+    SHOULDPASS {
+        run(conf, S("--cflags"), S("--libs"), S("example"),
+                S("--keep-system-libs"), E);
+    }
+    EXPECT("-DEXAMPLE -L/usr/lib -lexample\n");
+}
+
+static void test_libsorder(void)
+{
+    // Scenario: two packages link a common library
+    // Expect: the common library is listed after both, other flags
+    //   maintain their first-seen position and de-duplicate the rest
+    Config conf = newtest_(S("library ordering"));
+    newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
+        PCHDR
+        "Cflags: -DA -DGL\n"
+        "Libs: -L/opt/lib -mwindows -la -lopengl32\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/b.pc"), S(
+        PCHDR
+        "Cflags: -DB -DGL\n"
+        "Libs: -L/opt/lib -mwindows -lb -lopengl32\n"
+    ));
+    SHOULDPASS {
+        run(conf, S("--cflags"), S("--libs"), S("a b"), E);
+    }
+    EXPECT("-DA -DGL -DB -L/opt/lib -mwindows -la -lb -lopengl32\n");
 }
 
 static void test_windows(void)
@@ -458,6 +490,7 @@ int main(void)
     test_private_transitive();
     test_revealed_transitive();
     test_syspaths();
+    test_libsorder();
     test_windows();
     test_manyvars();
     test_lol();
