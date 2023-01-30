@@ -2,7 +2,9 @@
 // $ afl-clang-fast -fsanitize=undefined -fsanitize-undefined-trap-on-error
 //     fuzz_main.c
 // $ afl-fuzz -i /usr/share/pkgconfig -o fuzzout ./a.out
-#define DEBUG
+#ifndef DEBUG
+#  define DEBUG
+#endif
 #include "u-config.c"
 #include <setjmp.h>
 #include <stdlib.h>

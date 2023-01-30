@@ -83,8 +83,8 @@ With pre-2015 MSVC, compile as C++:
 
     $ cl /TP /O2 /Fe:pkg-config win32_main.c
 
-As a convenience, the Makefile provides a more aggressively optimized GCC
-build configuration.
+The Makefile documents compiler options for a more aggressively optimized
+GCC-based build.
 
 ## Configuration
 

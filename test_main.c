@@ -2,7 +2,9 @@
 // On success prints "all tests pass" (for humans) and exits with a zero
 // status (for scripts). Attach a debugger to examine failures in detail.
 // This is free and unencumbered software released into the public domain.
-#define DEBUG
+#ifndef DEBUG
+#  define DEBUG
+#endif
 #include "u-config.c"
 #include <setjmp.h>
 #include <stdarg.h>
