@@ -138,12 +138,19 @@ static void test_modversion(void)
             "Name:\n"
             "Version: 1.2.3\n"
             "Description:\n"
+            "Requires: req"
         ));
         newfile_(&conf, S("/usr/share/pkgconfig/indirect.pc"), S(
             "major = 12\n"
             "minor = 345\n"
             "patch = 6789\n"
             "version = ${major}.${minor}.${patch}\n"
+            "Name:\n"
+            "Version: ${version}\n"
+            "Description:\n"
+        ));
+        newfile_(&conf, S("/usr/share/pkgconfig/req.pc"), S(
+            "version = 420.69.1337\n"
             "Name:\n"
             "Version: ${version}\n"
             "Description:\n"

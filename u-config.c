@@ -1489,7 +1489,7 @@ static void process(Arena *a, Processor *proc, Str arg)
                     stack[top].arg = pkg->requires;
                     stack[top].last = 0;
                     stack[top].depth = depth;
-                    stack[top].flags = (flags & ~Pkg_DIRECT) | flags;
+                    stack[top].flags = flags & ~Pkg_DIRECT;
                     stack[top].op = VersionOp_ERR;
                 }
             }
@@ -1514,7 +1514,7 @@ static void process(Arena *a, Processor *proc, Str arg)
                 stack[top].arg = pkg->requires;
                 stack[top].last = 0;
                 stack[top].depth = depth;
-                stack[top].flags = (flags & ~Pkg_DIRECT) | flags;
+                stack[top].flags = flags & ~Pkg_DIRECT;
                 stack[top].op = VersionOp_ERR;
             }
         }
