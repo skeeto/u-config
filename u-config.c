@@ -844,6 +844,7 @@ static void usage(Out *out)
     "  --modversion\n"
     "  --msvc-syntax\n"
     "  --newlines\n"
+    "  --silence-errors\n"
     "  --static\n"
     "  --with-path=PATH\n"
     "  -h, --help, --version\n"
@@ -1895,6 +1896,9 @@ static void appmain(Config conf)
                 r.value = getargopt(&err, &opts, r.arg);
             }
             return;  // always succeeds
+
+        } else if (equals(r.arg, S("-silence-errors"))) {
+            silent = 1;
 
         } else if (equals(r.arg, S("-print-errors"))) {
             // Ignore
