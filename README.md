@@ -27,7 +27,6 @@ based builds, not make more of them**. In summary:
 * Omits most `.pc` debugging features (`--print-…`)
 * No special handling of "uninstalled" packages, and no attendant knobs
 * Skips checks unimplemented by pkg-config (i.e. `Conflicts:`)
-* Omits clunky redundant features (`--errors-to-stdout`, etc.)
 * Less strict `.pc` syntax
 
 It still supports the important pkg-config run-time environment variables:

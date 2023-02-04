@@ -852,6 +852,7 @@ static void usage(Out *out)
     "  --define-prefix, --dont-define-prefix\n"
     "  --define-variable=NAME=VALUE, --variable=NAME\n"
     "  --exists, --validate\n"
+    "  --errors-to-stdout\n"
     "  --keep-system-cflags, --keep-system-libs\n"
     "  --libs, --libs-only-L, --libs-only-l, --libs-only-other\n"
     "  --maximum-traverse-depth=N\n"
@@ -1780,6 +1781,7 @@ static void appmain(Config conf)
     Bool msvc = 0;
     Bool libs = 0;
     Bool cflags = 0;
+    Bool err_to_stdout = 0;
     Bool silent = 0;
     Bool static_ = 0;
     Byte argdelim = ' ';
@@ -1918,6 +1920,9 @@ static void appmain(Config conf)
         } else if (equals(r.arg, S("-silence-errors"))) {
             silent = 1;
 
+        } else if (equals(r.arg, S("-errors-to-stdout"))) {
+            err_to_stdout = 1;
+
         } else if (equals(r.arg, S("-print-errors"))) {
             // Ignore
 
@@ -1945,6 +1950,10 @@ static void appmain(Config conf)
             flush(&err);
             os_fail();
         }
+    }
+
+    if (err_to_stdout) {
+        err = out;
     }
 
     if (silent) {
