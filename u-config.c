@@ -1906,6 +1906,9 @@ static void appmain(Config conf)
         } else if (equals(r.arg, S("-short-errors"))) {
             // Ignore
 
+        } else if (equals(r.arg, S("-uninstalled"))) {
+            // Ignore
+
         } else if (equals(r.arg, S("-keep-system-cflags"))) {
             print_sysinc = 1;
 
