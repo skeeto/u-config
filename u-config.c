@@ -1423,14 +1423,14 @@ static void process(Arena *a, Processor *proc, Str arg)
     stack[0].last = proc->last;
     stack[0].depth = 0;
     stack[0].flags = Pkg_DIRECT | Pkg_PUBLIC;
-    stack[0].op = VersionOp_ERR;
+    stack[0].op = proc->op;
 
     while (top >= 0) {
         ProcState *s = stack + top;
         StrPair pair = nexttoken(s->arg);
         Str tok = pair.head;
         if (!tok.len) {
-            if (s->op) {
+            if (top>0 && s->op) {
                 procfail(err, s->op, s->last);
             }
             top--;
@@ -1522,6 +1522,7 @@ static void process(Arena *a, Processor *proc, Str arg)
     }
 
     proc->last = stack[0].last;
+    proc->op = stack[0].op;
 }
 
 static void endprocessor(Processor *proc, Out *err)

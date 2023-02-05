@@ -160,7 +160,7 @@ static void test_modversion(void)
     }
 }
 
-static void test_badversion(void)
+static void test_versioncheck(void)
 {
     Config conf = newtest_(S("version checks"));
     newfile_(&conf, S("/usr/lib/pkgconfig/test.pc"), S(
@@ -172,21 +172,34 @@ static void test_badversion(void)
     SHOULDPASS {
         run(conf, S("--modversion"), S("test = 1.2.3"), E);
     }
+    SHOULDPASS {
+        run(conf, S("--modversion"), S("test "), S("= 1.2.3"), E);
+    }
+    SHOULDPASS {
+        run(conf, S("--modversion"), S("test "), S("="), S(" 1.2.3"), E);
+    }
+    SHOULDPASS {
+        run(conf, S("--modversion"), S("test ="), S("1.2.3"), E);
+    }
 
     SHOULDFAIL {
         run(conf, S("--modversion"), S("test < 1.2.3"), E);
     }
-
     SHOULDFAIL {
         run(conf, S("--modversion"), S("test <= 1.2.2"), E);
     }
-
     SHOULDFAIL {
         run(conf, S("--modversion"), S("test > 1.2.3"), E);
     }
-
     SHOULDFAIL {
         run(conf, S("--modversion"), S("test >= 1.2.4"), E);
+    }
+
+    SHOULDFAIL {
+        run(conf, S("--modversion"), S("test ="), E);
+    }
+    SHOULDFAIL {
+        run(conf, S("--modversion"), S("test"), S("="), E);
     }
 }
 
@@ -494,7 +507,7 @@ int main(void)
 
     test_noargs();
     test_modversion();
-    test_badversion();
+    test_versioncheck();
     test_maximum_traverse_depth();
     test_private_transitive();
     test_revealed_transitive();
