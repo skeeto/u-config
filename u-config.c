@@ -259,6 +259,11 @@ static Bool startswith(Str s, Str prefix)
     return s.len>=prefix.len && equals(takehead(s, prefix.len), prefix);
 }
 
+static Bool endswith(Str s, Str suffix)
+{
+    return s.len>=suffix.len && equals(taketail(s, suffix.len), suffix);
+}
+
 static Size hash(Str s)
 {
     unsigned long long h = 257;
@@ -1891,11 +1896,15 @@ static void appmain(Config conf)
             // The check already happens, just disable the messages
             silent = 1;
 
-        } else if (equals(r.arg, S("-atleast-pkgconfig-version"))) {
+        } else if (endswith(r.arg, S("-version"))) {
+            // --atleast-pkgconfig-version
+            // --atleast-version
+            // --exact-version
+            // --max-version
             if (!r.value.s) {
                 r.value = getargopt(&err, &opts, r.arg);
             }
-            return;  // always succeeds
+            // ignore
 
         } else if (equals(r.arg, S("-silence-errors"))) {
             silent = 1;
