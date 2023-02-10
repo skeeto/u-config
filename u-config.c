@@ -781,11 +781,12 @@ typedef struct {
     Size nargs;
     Str *args;
     Size index;
+    Bool dashdash;
 } OptionParser;
 
 static OptionParser newoptionparser(Str *args, Size nargs)
 {
-    OptionParser r = {nargs, args, 0};
+    OptionParser r = {nargs, args, 0, 0};
     return r;
 }
 
@@ -803,26 +804,34 @@ static OptionResult nextoption(OptionParser *p)
         return r;
     }
 
-    Str arg = p->args[p->index++];
-    if (arg.len<2 || arg.s[0]!='-') {
+    for (;;) {
+        Str arg = p->args[p->index++];
+
+        if (p->dashdash || arg.len<2 || arg.s[0]!='-') {
+            OptionResult r = {0};
+            r.arg = arg;
+            r.ok = 1;
+            return r;
+        }
+
+        if (!p->dashdash && equals(arg, S("--"))) {
+            p->dashdash = 1;
+            continue;
+        }
+
         OptionResult r = {0};
-        r.arg = arg;
+        r.isoption = 1;
         r.ok = 1;
+        arg = cuthead(arg, 1);
+        Cut c = cut(arg, '=');
+        if (c.ok) {
+            r.arg = c.head;
+            r.value = c.tail;
+        } else {
+            r.arg = arg;
+        }
         return r;
     }
-
-    OptionResult r = {0};
-    r.isoption = 1;
-    r.ok = 1;
-    arg = cuthead(arg, 1);
-    Cut c = cut(arg, '=');
-    if (c.ok) {
-        r.arg = c.head;
-        r.value = c.tail;
-    } else {
-        r.arg = arg;
-    }
-    return r;
 }
 
 static Str getargopt(Out *err, OptionParser *p, Str option)

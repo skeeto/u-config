@@ -130,6 +130,23 @@ static void test_noargs(void)
     }
 }
 
+static void test_dashdash(void)
+{
+    Config conf = newtest_(S("handle -- argument"));
+    newfile_(&conf, S("/usr/lib/pkgconfig/--foo.pc"), S(
+        PCHDR
+        "Cflags: -Dfoo\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/--.pc"), S(
+        PCHDR
+        "Cflags: -Ddashdash\n"
+    ));
+    SHOULDPASS {
+        run(conf, S("--cflags"), S("--"), S("--foo"), S("--"), E);
+    }
+    EXPECT("-Dfoo -Ddashdash\n");
+}
+
 static void test_modversion(void)
 {
     Config conf = newtest_(S("--modversion"));
@@ -506,6 +523,7 @@ int main(void)
     context.arena = newarena_(1<<21);
 
     test_noargs();
+    test_dashdash();
     test_modversion();
     test_versioncheck();
     test_maximum_traverse_depth();
