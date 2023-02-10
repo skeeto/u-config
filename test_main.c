@@ -220,6 +220,46 @@ static void test_versioncheck(void)
     }
 }
 
+static void test_overrides(void)
+{
+    Config conf = newtest_(S("--{atleast,exact,max}-version"));
+    newfile_(&conf, S("/usr/lib/pkgconfig/t.pc"), S(
+        "Name:\n"
+        "Version: 1\n"
+        "Description:\n"
+    ));
+
+    SHOULDPASS {
+        run(conf, S("--atleast-version=0"), S("t > 1"), E);
+    }
+    SHOULDPASS {
+        run(conf, S("--exact-version=1"), S("t > 1"), E);
+    }
+    SHOULDPASS {
+        run(conf, S("--max-version=2"), S("t > 1"), E);
+    }
+
+    SHOULDFAIL {
+        run(conf, S("--atleast-version=2"), S("t = 1"), E);
+    }
+    SHOULDFAIL {
+        run(conf, S("--exact-version=2"), S("t = 1"), E);
+    }
+    SHOULDFAIL {
+        run(conf, S("--max-version=0"), S("t = 1"), E);
+    }
+
+    SHOULDFAIL {
+        run(conf, S("--atleast-version=2"), S("t"), E);
+    }
+    SHOULDFAIL {
+        run(conf, S("--exact-version=2"), S("t"), E);
+    }
+    SHOULDFAIL {
+        run(conf, S("--max-version=0"), S("t"), E);
+    }
+}
+
 static void test_maximum_traverse_depth(void)
 {
     Config conf = newtest_(S("--maximum-traverse-depth"));
@@ -526,6 +566,7 @@ int main(void)
     test_dashdash();
     test_modversion();
     test_versioncheck();
+    test_overrides();
     test_maximum_traverse_depth();
     test_private_transitive();
     test_revealed_transitive();

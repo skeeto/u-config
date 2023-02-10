@@ -259,11 +259,6 @@ static Bool startswith(Str s, Str prefix)
     return s.len>=prefix.len && equals(takehead(s, prefix.len), prefix);
 }
 
-static Bool endswith(Str s, Str suffix)
-{
-    return s.len>=suffix.len && equals(taketail(s, suffix.len), suffix);
-}
-
 static Size hash(Str s)
 {
     unsigned long long h = 257;
@@ -851,7 +846,7 @@ static void usage(Out *out)
     "  --cflags, --cflags-only-I, --cflags-only-other\n"
     "  --define-prefix, --dont-define-prefix\n"
     "  --define-variable=NAME=VALUE, --variable=NAME\n"
-    "  --exists, --validate\n"
+    "  --exists, --validate, --{atleast,exact,max}-version=VERSION\n"
     "  --errors-to-stdout\n"
     "  --keep-system-cflags, --keep-system-libs\n"
     "  --libs, --libs-only-L, --libs-only-l, --libs-only-other\n"
@@ -1351,16 +1346,22 @@ typedef struct {
     VersionOp op;
     Bool define_prefix;
     Bool recursive;
+    Bool ignore_versions;
 } Processor;
 
 static Processor newprocessor(Config *c, Out *err, Env *g, Pkgs *pkgs)
 {
     Arena *a = &c->arena;
-    Search search = newsearch(c->delim);
-    appendpath(a, &search, c->envpath);
-    appendpath(a, &search, c->fixedpath);
-    int maxdepth = (unsigned)-1 >> 1;
-    Processor proc = {err, search, g, pkgs, 0, maxdepth, VersionOp_ERR, 1, 1};
+    Processor proc = {0};
+    proc.err = err;
+    proc.search = newsearch(c->delim);
+    appendpath(a, &proc.search, c->envpath);
+    appendpath(a, &proc.search, c->fixedpath);
+    proc.global = g;
+    proc.pkgs = pkgs;
+    proc.maxdepth = (unsigned)-1 >> 1;
+    proc.define_prefix = 1;
+    proc.recursive = 1;
     return proc;
 }
 
@@ -1422,6 +1423,22 @@ static void failmaxrecurse(Out *err, Str tok)
     os_fail();
 }
 
+static void failversion(Out *err, Pkg *pkg, VersionOp op, Str want)
+{
+    outstr(err, S("pkg-config: "));
+    outstr(err, S("requested '"));
+    outstr(err, pkg->realname);
+    outstr(err, S("' "));
+    outstr(err, opname(op));
+    outstr(err, S(" '"));
+    outstr(err, want);
+    outstr(err, S("' but got '"));
+    outstr(err, pkg->version);
+    outstr(err, S("'\n"));
+    flush(err);
+    os_fail();
+}
+
 static void process(Arena *a, Processor *proc, Str arg)
 {
     Out *err = proc->err;
@@ -1455,20 +1472,11 @@ static void process(Arena *a, Processor *proc, Str arg)
         stack[top].arg = pair.tail;
 
         if (s->op) {
-            int cmp = compareversions(s->last->version, tok);
-            if (!validcompare(s->op, cmp)) {
-                outstr(err, S("pkg-config: "));
-                outstr(err, S("requested '"));
-                outstr(err, s->last->realname);
-                outstr(err, S("' "));
-                outstr(err, opname(s->op));
-                outstr(err, S(" '"));
-                outstr(err, tok);
-                outstr(err, S("' but got '"));
-                outstr(err, s->last->version);
-                outstr(err, S("'\n"));
-                flush(err);
-                os_fail();
+            if (!proc->ignore_versions) {
+                int cmp = compareversions(s->last->version, tok);
+                if (!validcompare(s->op, cmp)) {
+                    failversion(err, s->last, s->op, tok);
+                }
             }
             s->last = 0;
             s->op = VersionOp_ERR;
@@ -1786,6 +1794,8 @@ static void appmain(Config conf)
     Bool static_ = 0;
     Byte argdelim = ' ';
     Bool modversion = 0;
+    VersionOp override_op = VersionOp_ERR;
+    Str override_version = {0, 0};
     Bool print_sysinc = 0;
     Bool print_syslib = 0;
     Str variable = {0, 0};
@@ -1907,15 +1917,41 @@ static void appmain(Config conf)
             // The check already happens, just disable the messages
             silent = 1;
 
-        } else if (endswith(r.arg, S("-version"))) {
-            // --atleast-pkgconfig-version
-            // --atleast-version
-            // --exact-version
-            // --max-version
+        } else if (equals(r.arg, S("-atleast-pkgconfig-version"))) {
             if (!r.value.s) {
                 r.value = getargopt(&err, &opts, r.arg);
             }
-            // ignore
+            return;  // always succeeds
+
+        } else if (equals(r.arg, S("-atleast-version"))) {
+            if (!r.value.s) {
+                r.value = getargopt(&err, &opts, r.arg);
+            }
+            override_op = VersionOp_GTE;
+            override_version = r.value;
+            silent = 1;
+            proc.recursive = 0;
+            proc.ignore_versions = 1;
+
+        } else if (equals(r.arg, S("-exact-version"))) {
+            if (!r.value.s) {
+                r.value = getargopt(&err, &opts, r.arg);
+            }
+            override_op = VersionOp_EQ;
+            override_version = r.value;
+            silent = 1;
+            proc.recursive = 0;
+            proc.ignore_versions = 1;
+
+        } else if (equals(r.arg, S("-max-version"))) {
+            if (!r.value.s) {
+                r.value = getargopt(&err, &opts, r.arg);
+            }
+            override_op = VersionOp_LTE;
+            override_version = r.value;
+            silent = 1;
+            proc.recursive = 0;
+            proc.ignore_versions = 1;
 
         } else if (equals(r.arg, S("-silence-errors"))) {
             silent = 1;
@@ -1970,6 +2006,16 @@ static void appmain(Config conf)
         outstr(&err, S("requires at least one package name\n"));
         flush(&err);
         os_fail();
+    }
+
+    // --{atleast,exact,max}-version
+    if (override_op) {
+        for (Pkg *p = pkgs.head; p; p = p->list) {
+            int cmp = compareversions(p->version, override_version);
+            if (!validcompare(override_op, cmp)) {
+                failversion(&err, p, override_op, override_version);
+            }
+        }
     }
 
     if (modversion) {
