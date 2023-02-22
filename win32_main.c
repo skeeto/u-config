@@ -15,6 +15,7 @@
   #else
     #define EXTERN
   #endif
+  #define ENTRYPOINT EXTERN
   #pragma comment(lib, "kernel32.lib")
   #pragma comment(linker, "/subsystem:console")
   #if _MSC_VER >= 1400
@@ -30,6 +31,11 @@
     #define EXTERN extern "C" __attribute__((externally_visible))
   #else
     #define EXTERN __attribute__((externally_visible))
+  #endif
+  #if __i686__
+    #define ENTRYPOINT EXTERN __attribute__((force_align_arg_pointer))
+  #else
+    #define ENTRYPOINT EXTERN
   #endif
   // NOTE: These functions are required at higher GCC optimization
   // levels. Placing them in their own section allows them to be
@@ -139,7 +145,7 @@ static Str fromcstr_(char *z)
     return s;
 }
 
-EXTERN
+ENTRYPOINT
 int mainCRTStartup(void)
 {
     Config conf = {0};
