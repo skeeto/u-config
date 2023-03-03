@@ -131,9 +131,12 @@ static void os_fail(void)
 static void os_write(int fd, Str s)
 {
     ASSERT(fd==1 || fd==2);
-    long r = syscall3(SYS_write, fd, (long)s.s, s.len);
-    if (r != s.len) {
-        os_fail();
+    while (s.len) {
+        long r = syscall3(SYS_write, fd, (long)s.s, s.len);
+        if (r < 0) {
+            os_fail();
+        }
+        s = cuthead(s, r);
     }
 }
 
