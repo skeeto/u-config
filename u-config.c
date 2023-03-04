@@ -8,10 +8,9 @@
 
 typedef int Size;
 #define Size_MASK ((unsigned)-1)
-#define Size_MAX  ((Size)(Size_MASK>>1) - (ALIGN-1))
+#define Size_MAX  ((Size)(Size_MASK >> 1))
 
 #define SIZEOF(x) (Size)(sizeof(x))
-#define ALIGN SIZEOF(void *)
 #define COUNTOF(a) (SIZEOF(a)/SIZEOF(a[0]))
 
 typedef int Bool;
@@ -133,14 +132,13 @@ static Str fillstr(Str s, Byte b)
 static void *alloc(Arena *a, Size size)
 {
     ASSERT(size >= 0);
-    ASSERT(size <= Size_MAX);
-    size += -size & (ALIGN - 1);
+    Size align = -size & (SIZEOF(void *) - 1);
     Size avail = a->mem.len - a->off;
-    if (avail < size) {
+    if (avail-align < size) {
         oom();
     }
     Byte *p = a->mem.s + a->off;
-    a->off += size;
+    a->off += size + align;
     return p;
 }
 
