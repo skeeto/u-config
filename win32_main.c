@@ -80,7 +80,7 @@ static Arena newarena_(void)
     return arena;
 }
 
-static Str fromwide_(Arena *a, WCHAR *w, Size wlen)
+static Str fromwide_(Arena *a, wchar_t *w, Size wlen)
 {
     // NOTE: consider replacing the Win32 UTF-8 encoder/decoder with an
     // embedded WTF-8 encoder/decoder
@@ -90,11 +90,11 @@ static Str fromwide_(Arena *a, WCHAR *w, Size wlen)
     return s;
 }
 
-static Str fromenv_(Arena *a, const WCHAR *name)
+static Str fromenv_(Arena *a, const wchar_t *name)
 {
     // NOTE: maximum environment variable size is 2**15-1, so this
     // cannot fail if the variable actually exists
-    static WCHAR w[1<<15];
+    static wchar_t w[1<<15];
     DWORD wlen = GetEnvironmentVariableW(name, w, sizeof(w));
     if (!wlen) {
         Str r = {0};
@@ -105,7 +105,7 @@ static Str fromenv_(Arena *a, const WCHAR *name)
 
 static Str installdir_(Arena *a)
 {
-    WCHAR exe[MAX_PATH];
+    wchar_t exe[MAX_PATH];
     Size len = GetModuleFileNameW(0, exe, MAX_PATH);
     for (Size i = 0; i < len; i++) {
         if (exe[i] == '\\') {
@@ -188,7 +188,7 @@ static MapFileResult os_mapfile(Arena *a, Str path)
     ASSERT(path.len > 0);
     ASSERT(!path.s[path.len-1]);
 
-    WCHAR wpath[MAX_PATH];
+    wchar_t wpath[MAX_PATH];
     int wlen = MultiByteToWideChar(
         CP_UTF8, 0, (char *)path.s, path.len, wpath, MAX_PATH
     );
@@ -255,7 +255,7 @@ static void os_write(int fd, Str s)
     DWORD n;
 
     if (fd==2 && error_is_console) {
-        static WCHAR tmp[1<<12];
+        static wchar_t tmp[1<<12];
         int len = MultiByteToWideChar(
             CP_UTF8, 0, (char *)s.s, s.len, tmp, sizeof(tmp)
         );
