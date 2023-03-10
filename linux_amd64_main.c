@@ -25,7 +25,7 @@
 #define SYS_mmap  9
 #define SYS_exit  60
 
-__asm(
+__asm (
     ".global _start\n"
     "_start:\n"
     "   movl  (%rsp), %edi\n"
@@ -67,7 +67,12 @@ __attribute__((section(".text.strlen")))
 unsigned long strlen(const char *s)
 {
     const char *b = s;
-    __asm("repne scasb" : "=D"(s) : "0"(s), "a"(0), "c"(-1L));
+    __asm volatile (
+        "repne scasb"
+        : "=D"(s)
+        : "0"(s), "a"(0), "c"(-1L)
+        : "memory"
+    );
     return s - b - 1;
 }
 
