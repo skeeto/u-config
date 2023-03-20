@@ -18,14 +18,21 @@
   #define ENTRYPOINT EXTERN
   #pragma comment(lib, "kernel32.lib")
   #pragma comment(linker, "/subsystem:console")
-  #if _MSC_VER >= 1400
-    #pragma function(memset)
-    void *memset(void *d, int c, size_t n)
-    {
-        __stosb((BYTE *)d, (BYTE)c, n);
-        return d;
-    }
-  #endif
+  #pragma function(memset)
+  void *memset(void *d, int c, size_t n)
+  {
+      char *dst = (char *)d;
+      for (; n; n--) *dst++ = (char)c;
+      return d;
+  }
+  #pragma function(memcpy)
+  void *memcpy(void *d, const void *s, size_t n)
+  {
+      char *dst = (char *)d;
+      char *src = (char *)s;
+      for (; n; n--) *dst++ = *src++;
+      return d;
+  }
 #elif __GNUC__
   #ifdef __cplusplus
     #define EXTERN extern "C" __attribute__((externally_visible))
