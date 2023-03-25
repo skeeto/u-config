@@ -2,8 +2,7 @@
 // This is free and unencumbered software released into the public domain.
 #include "u-config.c"
 #include "cmdline.c"
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#include "miniwin32.h"
 
 #ifndef PKG_CONFIG_PREFIX
 #  define PKG_CONFIG_PREFIX
@@ -18,15 +17,17 @@
   #define ENTRYPOINT EXTERN
   #pragma comment(lib, "kernel32.lib")
   #pragma comment(linker, "/subsystem:console")
+  EXTERN void *memset(void *, int, size_t);
   #pragma function(memset)
-  void *memset(void *d, int c, size_t n)
+  EXTERN void *memset(void *d, int c, size_t n)
   {
       char *dst = (char *)d;
       for (; n; n--) *dst++ = (char)c;
       return d;
   }
+  EXTERN void *memcpy(void *, const void *, size_t);
   #pragma function(memcpy)
-  void *memcpy(void *d, const void *s, size_t n)
+  EXTERN void *memcpy(void *d, const void *s, size_t n)
   {
       char *dst = (char *)d;
       char *src = (char *)s;

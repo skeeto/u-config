@@ -33,11 +33,11 @@ pkg-config-linux-amd64-debug: linux_amd64_main.c u-config.c
 
 # Concatenate Windows-only u-config into a single source file
 amalgamation: pkg-config.c
-pkg-config.c: u-config.c cmdline.c win32_main.c
+pkg-config.c: u-config.c cmdline.c miniwin32.h win32_main.c
 	awk 'n{print"";n=0} NR==3{printf"%s\n%s\n",cc,cl} !/^#i.*"/{print}' \
 	    cc='//   $$ cc -nostartfiles -o pkg-config.exe pkg-config.c' \
 	    cl='//   $$ cl pkg-config.c' \
-	    >$@ u-config.c n=1 cmdline.c n=1 win32_main.c
+	    >$@ u-config.c n=1 cmdline.c n=1 miniwin32.h n=1 win32_main.c
 
 release:
 	version=$$(git describe); prefix=u-config-$${version#v}; \
