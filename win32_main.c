@@ -154,7 +154,7 @@ static Str fromcstr_(char *z)
 }
 
 ENTRYPOINT
-int mainCRTStartup(void)
+void mainCRTStartup(void)
 {
     Config conf = {0};
     conf.delim = ';';
@@ -228,7 +228,9 @@ static MapFileResult os_mapfile(Arena *a, Str path)
         CloseHandle(h);
         // Cannot map an empty file, so use the arena for a zero-size
         // allocation, distinguishing it from a null string.
-        MapFileResult r = {newstr(a, 0), MapFile_OK};
+        MapFileResult r = {0};
+        r.contents = newstr(a, 0);
+        r.status = MapFile_OK;
         return r;
     }
 

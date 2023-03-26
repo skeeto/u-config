@@ -19,7 +19,7 @@ typedef unsigned char Byte;
 #if __GNUC__
   #define TRAP __builtin_trap()
   #define NORETURN __attribute__((noreturn))
-#elif _MSC_VER
+#elif _MSC_VER > 1200
   #define TRAP __debugbreak()
   #define NORETURN __declspec(noreturn)
 #else
@@ -259,7 +259,7 @@ static Bool startswith(Str s, Str prefix)
 
 static Size hash(Str s)
 {
-    unsigned long long h = 257;
+    unsigned __int64 h = 257;
     for (Size i = 0; i < s.len; i++) {
         h ^= s.s[i];
         h *= 1111111111111111111;
@@ -297,7 +297,10 @@ static StrPair nexttoken(Str s)
     s = skiptokenspace(s);
     Size len = 0;
     for (; len<s.len && !tokenspace(s.s[len]); len++) {}
-    StrPair r = {{s.s, len}, cuthead(s, len)};
+    StrPair r = {0};
+    r.head.s = s.s;
+    r.head.len = len;
+    r.tail = cuthead(s, len);
     return r;
 }
 
@@ -316,10 +319,17 @@ static Cut cut(Str s, Byte delim)
         }
     }
     if (len == s.len) {
-        Cut r = {s, cuthead(s, s.len), 0};
+        Cut r = {0};
+        r.head = s;
+        r.tail = cuthead(s, s.len);
+        r.ok = 0;
         return r;
     }
-    Cut r = {{s.s, len}, cuthead(s, len+1), 1};
+    Cut r = {0};
+    r.head.s = s.s;
+    r.head.len = len;
+    r.tail = cuthead(s, len+1);
+    r.ok = 1;
     return r;
 }
 
@@ -394,7 +404,11 @@ typedef struct {
 static Out newoutput(Arena *a, int fd, Size len)
 {
     Str buf = newstr(a, len);
-    Out out = {buf, buf, 0, fd};
+    Out out = {0};
+    out.buf = buf;
+    out.avail = buf;
+    out.a = 0;
+    out.fd = fd;
     return out;
 }
 
@@ -410,7 +424,11 @@ static Out newnullout(void)
 static Out newmembuf(Arena *a)
 {
     Str max = maxstr(a);
-    Out out = {max, max, a, 0};
+    Out out = {0};
+    out.buf = max;
+    out.avail = max;
+    out.a = a;
+    out.fd = 0;
     return out;
 }
 
@@ -832,7 +850,9 @@ static Str getargopt(Out *err, OptionParser *p, Str option)
     if (p->index == p->nargs) {
         missing(err, option);
     }
-    return p->args[p->index++];
+    Str value = p->args[p->index];
+    p->index++;
+    return value;
 }
 
 static void usage(Out *out)
@@ -1231,7 +1251,10 @@ static DequoteResult dequote(Arena *a, Str s)
         return r;
     }
 
-    DequoteResult r = {finalize(&mem), cuthead(s, i), 1};
+    DequoteResult r = {0};
+    r.arg = finalize(&mem);
+    r.tail = cuthead(s, i);
+    r.ok = 1;
     return r;
 }
 

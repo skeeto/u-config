@@ -13,9 +13,9 @@
 
 #define E S("")
 #define SHOULDPASS \
-    for (int r = setjmp(context.exit); !r || (r>0 && (TRAP, 0)); r = -1)
+    for (r = setjmp(context.exit); !r || (r>0 && (TRAP, 0)); r = -1)
 #define SHOULDFAIL \
-    for (int r = setjmp(context.exit); !r; TRAP)
+    for (r = setjmp(context.exit); !r; TRAP)
 #define PCHDR "Name:\n" "Version:\n" "Description:\n"
 #define EXPECT(w) \
     if (!equals(context.output, S(w))) { \
@@ -55,7 +55,9 @@ static MapFileResult os_mapfile(Arena *a, Str path)
         MapFileResult r = {{0, 0}, MapFile_NOTFOUND};
         return r;
     }
-    MapFileResult r = {*contents, MapFile_OK};
+    MapFileResult r = {0};
+    r.contents = *contents;
+    r.status = MapFile_OK;
     return r;
 }
 
@@ -124,6 +126,7 @@ static void run(Config conf, ...)
 static void test_noargs(void)
 {
     // NOTE: this is mainly a sanity check of the test system itself
+    int r;
     Config conf = newtest_(S("no arguments"));
     SHOULDFAIL {
         run(conf, E);
@@ -132,6 +135,7 @@ static void test_noargs(void)
 
 static void test_dashdash(void)
 {
+    int r;
     Config conf = newtest_(S("handle -- argument"));
     newfile_(&conf, S("/usr/lib/pkgconfig/--foo.pc"), S(
         PCHDR
@@ -149,6 +153,7 @@ static void test_dashdash(void)
 
 static void test_modversion(void)
 {
+    int r;
     Config conf = newtest_(S("--modversion"));
     SHOULDPASS {
         newfile_(&conf, S("/usr/lib/pkgconfig/direct.pc"), S(
@@ -179,6 +184,7 @@ static void test_modversion(void)
 
 static void test_versioncheck(void)
 {
+    int r;
     Config conf = newtest_(S("version checks"));
     newfile_(&conf, S("/usr/lib/pkgconfig/test.pc"), S(
         "Name:\n"
@@ -222,6 +228,7 @@ static void test_versioncheck(void)
 
 static void test_overrides(void)
 {
+    int r;
     Config conf = newtest_(S("--{atleast,exact,max}-version"));
     newfile_(&conf, S("/usr/lib/pkgconfig/t.pc"), S(
         "Name:\n"
@@ -262,6 +269,7 @@ static void test_overrides(void)
 
 static void test_maximum_traverse_depth(void)
 {
+    int r;
     Config conf = newtest_(S("--maximum-traverse-depth"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
@@ -298,6 +306,7 @@ static void test_private_transitive(void)
 {
     // Scenario: a privately requires b which publicly requires c
     // Expect: --libs should not include c without --static
+    int r;
     Config conf = newtest_(S("private transitive"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
@@ -339,6 +348,7 @@ static void test_revealed_transitive(void)
     // The trouble is that x is initially loaded private. However, when
     // loading b it should become public, and so must be revisited in
     // traversal and marked as such.
+    int r;
     Config conf = newtest_(S("revealed transitive"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
@@ -367,6 +377,7 @@ static void test_revealed_transitive(void)
 
 static void test_syspaths(void)
 {
+    int r;
     Config conf = newtest_(S("exclude syspaths"));
     newfile_(&conf, S("/usr/lib/pkgconfig/example.pc"), S(
         PCHDR
@@ -395,6 +406,7 @@ static void test_libsorder(void)
     // Scenario: two packages link a common library
     // Expect: the common library is listed after both, other flags
     //   maintain their first-seen position and de-duplicate the rest
+    int r;
     Config conf = newtest_(S("library ordering"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
@@ -418,6 +430,7 @@ static void test_windows(void)
     // prefixes containing spaces are properly quoted. The fixed path
     // would be Win32 platform's fixed path if the binary was located in
     // "$HOME/bin".
+    int r;
     Config conf = newtest_(S("windows"));
     conf.fixedpath = S(
         "C:/Documents and Settings/John Falstaff/lib/pkgconfig;"
@@ -492,6 +505,7 @@ static void outlong_(Out *out, long x)
 static void test_manyvars(void)
 {
     // Stresses the treap-backed package environment
+    int r;
     Config conf = newtest_(S("many variables"));
     newfile_(&conf, S("manyvars.pc"), S(""));  // allocate empty file
     long nvars = 10000;
@@ -529,6 +543,7 @@ static void test_manyvars(void)
 
 static void test_lol(void)
 {
+    int r;
     Config conf = newtest_(S("a billion laughs"));
     newfile_(&conf, S("lol.pc"), S(
         "v9=lol\n"
