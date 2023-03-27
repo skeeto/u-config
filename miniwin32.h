@@ -12,31 +12,32 @@ typedef unsigned DWORD;
   typedef unsigned short wchar_t;
 #endif
 
-#define MAX_PATH 260
 #define CP_UTF8 65001
+
+#define FILE_ATTRIBUTE_NORMAL 0x80
+
+#define FILE_MAP_READ 4
+
+#define FILE_SHARE_DELETE 4
+#define FILE_SHARE_READ   1
+#define FILE_SHARE_WRITE  2
+
+#define GENERIC_READ 0x80000000
+
+#define INVALID_HANDLE_VALUE ((HANDLE)-1)
+
+#define MAX_PATH 260
 
 #define MEM_COMMIT  0x1000
 #define MEM_RESERVE 0x2000
 
+#define OPEN_EXISTING 3
+
 #define PAGE_READONLY  2
 #define PAGE_READWRITE 4
 
-#define STD_OUTPUT_HANDLE -11
 #define STD_ERROR_HANDLE  -12
-
-#define FILE_MAP_READ 4
-
-#define GENERIC_READ 0x80000000
-
-#define FILE_SHARE_READ   1
-#define FILE_SHARE_WRITE  2
-#define FILE_SHARE_DELETE 4
-
-#define OPEN_EXISTING 3
-
-#define FILE_ATTRIBUTE_NORMAL 0x80
-
-#define INVALID_HANDLE_VALUE ((void *)-1)
+#define STD_OUTPUT_HANDLE -11
 
 #ifdef __cplusplus
 extern "C" {

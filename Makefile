@@ -9,10 +9,10 @@ WIN32_LIBS   = -s -nostdlib -Wl,--gc-sections -lkernel32
 LINUX_CFLAGS = -fno-asynchronous-unwind-tables -fno-pie -fwhole-program
 LINUX_LIBS   = -s -no-pie -nostdlib -Wl,--gc-sections
 
-pkg-config.exe: win32_main.c cmdline.c u-config.c
+pkg-config.exe: win32_main.c cmdline.c miniwin32.h u-config.c
 	$(CROSS)$(CC) $(OPT) $(WIN32_CFLAGS) -o $@ win32_main.c $(WIN32_LIBS)
 
-pkg-config-debug.exe: win32_main.c cmdline.c u-config.c
+pkg-config-debug.exe: win32_main.c cmdline.c miniwin32.h u-config.c
 	$(CROSS)$(CC) -nostartfiles $(DEBUG_CFLAGS) -o $@ win32_main.c
 
 # Auto-configure using the system's pkg-config search path
@@ -53,7 +53,7 @@ check test: tests$(EXE)
 	./tests$(EXE)
 
 # Build and install into w64devkit
-install: win32_main.c cmdline.c u-config.c
+install: win32_main.c cmdline.c miniwin32.h u-config.c
 	$(CROSS)$(CC) $(OPT) $(WIN32_CFLAGS) win32_main.c \
 	  -DPKG_CONFIG_PREFIX="\"/$$(gcc -dumpmachine)\"" \
 	  -o $(W64DEVKIT_HOME)/bin/pkg-config.exe $(WIN32_LIBS)
