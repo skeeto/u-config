@@ -337,7 +337,7 @@ static void test_revealed_transitive(void)
     // Expect: "--libs a" lists only a, "--libs a b" reveals x
     //
     // The trouble is that x is initially loaded private. However, when
-    // laoding b it should become public, and so must be revisited in
+    // loading b it should become public, and so must be revisited in
     // traversal and marked as such.
     Config conf = newtest_(S("revealed transitive"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
