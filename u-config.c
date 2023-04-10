@@ -4,7 +4,7 @@
 
 // Fundamental definitions
 
-#define VERSION "0.31.0"
+#define VERSION "0.31.1"
 
 typedef int Size;
 #define Size_MASK ((unsigned)-1)
