@@ -25,112 +25,17 @@
 #define SYS_mmap  9
 #define SYS_exit  60
 
-__asm (
-    ".global _start\n"
-    "_start:\n"
-    "   movl  (%rsp), %edi\n"
-    "   lea   8(%rsp), %rsi\n"
-    "   lea   8(%rsi,%rdi,8), %rdx\n"
-    "   call  os_main\n"
-    "   movl  %eax, %edi\n"
-    "   movl  $60, %eax\n"
-    "   syscall\n"
-);
-
-__attribute__((section(".text.memset")))
-void *memset(void *d, int c, unsigned long n)
-{
-    void *r = d;
-    __asm volatile (
-        "rep stosb"
-        : "+D"(d), "+c"(n)
-        : "a"(c)
-        : "memory"
-    );
-    return r;
-}
-
-__attribute__((section(".text.memcpy")))
-void *memcpy(void *d, const void *s, unsigned long n)
-{
-    void *r = d;
-    __asm volatile (
-        "rep movsb"
-        : "+D"(d), "+S"(s), "+c"(n)
-        :
-        : "memory"
-    );
-    return r;
-}
-
-__attribute__((section(".text.strlen")))
-unsigned long strlen(const char *s)
-{
-    unsigned long n = -1;
-    __asm volatile (
-        "repne scasb"
-        : "+D"(s), "+c"(n)
-        : "a"(0)
-        : "memory"
-    );
-    return -n - 2;
-}
-
-static long syscall1(long n, long a)
-{
-    long r;
-    __asm volatile (
-        "syscall"
-        : "=a"(r)
-        : "a"(n), "D"(a)
-        : "rcx", "r11", "memory"
-    );
-    return r;
-}
-
-static long syscall2(long n, long a, long b)
-{
-    long r;
-    __asm volatile (
-        "syscall"
-        : "=a"(r)
-        : "a"(n), "D"(a), "S"(b)
-        : "rcx", "r11", "memory"
-    );
-    return r;
-}
-
-static long syscall3(long n, long a, long b, long c)
-{
-    long r;
-    __asm volatile (
-        "syscall"
-        : "=a"(r)
-        : "a"(n), "D"(a), "S"(b), "d"(c)
-        : "rcx", "r11", "memory"
-    );
-    return r;
-}
-
-static long syscall6(long n, long a, long b, long c, long d, long e, long f)
-{
-    long r;
-    register long r10 asm("r10") = d;
-    register long r8  asm("r8")  = e;
-    register long r9  asm("r9")  = f;
-    __asm volatile (
-        "syscall"
-        : "=a"(r)
-        : "a"(n), "D"(a), "S"(b), "d"(c), "r"(r10), "r"(r8), "r"(r9)
-        : "rcx", "r11", "memory"
-    );
-    return r;
-}
+long syscall1(long, long);
+long syscall2(long, long, long);
+long syscall3(long, long, long, long);
+long syscall6(long, long, long, long, long, long, long);
 
 static void os_fail(void)
 {
     syscall1(SYS_exit, 1);
+    #if __GNUC__
     __builtin_unreachable();
+    #endif
 }
 
 static void os_write(int fd, Str s)
