@@ -43,8 +43,8 @@ void *memset(void *d, int c, unsigned long n)
     void *r = d;
     __asm volatile (
         "rep stosb"
-        : "=D"(d), "=a"(c), "=c"(n)
-        : "0"(d), "1"(c), "2"(n)
+        : "+D"(d), "+c"(n)
+        : "a"(c)
         : "memory"
     );
     return r;
@@ -56,8 +56,8 @@ void *memcpy(void *d, const void *s, unsigned long n)
     void *r = d;
     __asm volatile (
         "rep movsb"
-        : "=D"(d), "=S"(s), "=c"(n)
-        : "0"(d), "1"(s), "2"(n)
+        : "+D"(d), "+S"(s), "+c"(n)
+        :
         : "memory"
     );
     return r;
@@ -66,14 +66,14 @@ void *memcpy(void *d, const void *s, unsigned long n)
 __attribute__((section(".text.strlen")))
 unsigned long strlen(const char *s)
 {
-    const char *b = s;
+    unsigned long n = -1;
     __asm volatile (
         "repne scasb"
-        : "=D"(s)
-        : "0"(s), "a"(0), "c"(-1L)
+        : "+D"(s), "+c"(n)
+        : "a"(0)
         : "memory"
     );
-    return s - b - 1;
+    return -n - 2;
 }
 
 static long syscall1(long n, long a)
