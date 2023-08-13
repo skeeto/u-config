@@ -156,12 +156,12 @@ Example, if just outside a sysroot which identifies the architecture:
 While both are supported, u-config prefers slashes over backslashes in
 order to reduce issues involving backslash as a shell metacharacter.
 
-### x86-64 Linux configuration options
+### libc-free Linux configuration options
 
-`linux_amd64_main.c` makes direct Linux system calls using assembly and
-does not require libc. It compiles to a ~20kB static executable that will
-work on any x86-64 Linux host. It supports these configuration macros with
-the same behavior as the generic platform.
+`linux_*_main.c` makes direct Linux system calls using assembly and does
+not require libc. It compiles to a ~20kB static executable that will work
+on any Linux distribution. It supports these configuration macros with the
+same behavior as the generic platform.
 
 * `PKG_CONFIG_LIBDIR`
 * `PKG_CONFIG_SYSTEM_INCLUDE_PATH`

@@ -62,14 +62,6 @@
       );
       return r;
   }
-  EXTERN
-  __attribute__((section(".text.strlen")))
-  size_t strlen(const char *s)
-  {
-      const char *b = s;
-      __asm("repne scasb" : "=D"(s) : "0"(s), "a"(0), "c"((size_t)-1));
-      return s - b - 1;
-  }
 #endif
 
 static Bool error_is_console = 0;

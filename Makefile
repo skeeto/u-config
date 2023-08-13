@@ -1,12 +1,14 @@
 CROSS = x86_64-w64-mingw32-
 CC    = gcc
 OPT   = -Os
+PC    = pkg-config  # e.g. for CROSS-pkg-config
 
 DEBUG_CFLAGS = -g3 -DDEBUG -Wall -Wextra -Wconversion -Wno-sign-conversion \
   -fsanitize=undefined -fsanitize-undefined-trap-on-error
-WIN32_CFLAGS = -fwhole-program -fno-asynchronous-unwind-tables
+WIN32_CFLAGS = -fno-builtin -fwhole-program -fno-asynchronous-unwind-tables
 WIN32_LIBS   = -s -nostdlib -Wl,--gc-sections -lkernel32
-LINUX_CFLAGS = -fno-asynchronous-unwind-tables -fno-pie -fwhole-program
+LINUX_CFLAGS = -fno-builtin -fno-pie -fwhole-program \
+  -fno-asynchronous-unwind-tables
 LINUX_LIBS   = -s -no-pie -nostdlib -Wl,--gc-sections
 
 pkg-config.exe: win32_main.c cmdline.c miniwin32.h u-config.c
@@ -18,18 +20,26 @@ pkg-config-debug.exe: win32_main.c cmdline.c miniwin32.h u-config.c
 # Auto-configure using the system's pkg-config search path
 pkg-config: generic_main.c u-config.c
 	$(CC) $(OPT) -o $@ generic_main.c \
-	  -DPKG_CONFIG_LIBDIR="\"$$(pkg-config --variable pc_path pkg-config)\""
+	  -DPKG_CONFIG_LIBDIR="\"$$($(PC) --variable pc_path pkg-config)\""
 
 pkg-config-debug: generic_main.c u-config.c
 	$(CC) $(DEBUG_CFLAGS) -o $@ generic_main.c
 
 # Auto-configure using the system's pkg-config search path
-pkg-config-linux-amd64: linux_amd64_main.c u-config.c
+pkg-config-linux-amd64: linux_amd64_main.c linux_noarch.c u-config.c
 	$(CC) $(OPT) $(LINUX_CFLAGS) -o $@ linux_amd64_main.c $(LINUX_LIBS) \
-	  -DPKG_CONFIG_LIBDIR="\"$$(pkg-config --variable pc_path pkg-config)\""
+	  -DPKG_CONFIG_LIBDIR="\"$$($(PC) --variable pc_path pkg-config)\""
 
-pkg-config-linux-amd64-debug: linux_amd64_main.c u-config.c
-	$(CC) -nostdlib $(DEBUG_CFLAGS) -o $@ linux_amd64_main.c
+pkg-config-linux-amd64-debug: linux_amd64_main.c linux_noarch.c u-config.c
+	$(CC) -nostdlib -fno-builtin $(DEBUG_CFLAGS) -o $@ linux_amd64_main.c
+
+# Auto-configure using the system's pkg-config search path
+pkg-config-linux-i686: linux_i686_main.c linux_noarch.c u-config.c
+	$(CC) $(OPT) $(LINUX_CFLAGS) -o $@ linux_i686_main.c $(LINUX_LIBS) \
+	  -DPKG_CONFIG_LIBDIR="\"$$($(PC) --variable pc_path pkg-config)\""
+
+pkg-config-linux-i686-debug: linux_i686_main.c linux_noarch.c u-config.c
+	$(CC) -nostdlib -fno-builtin $(DEBUG_CFLAGS) -o $@ linux_i686_main.c
 
 # Concatenate Windows-only u-config into a single source file
 amalgamation: pkg-config.c
@@ -62,6 +72,7 @@ clean:
 	rm -f pkg-config.exe pkg-config-debug.exe \
 	      pkg-config pkg-config-debug \
 	      pkg-config-linux-amd64 pkg-config-linux-amd64-debug \
+	      pkg-config-linux-i686 pkg-config-linux-i686-debug \
 	      pkg-config.c u-config-*.tar.gz \
 	      tests.exe tests \
 	      *.ilk *.obj *.pdb test_main.exe
