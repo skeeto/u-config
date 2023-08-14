@@ -5,10 +5,9 @@ PC    = pkg-config  # e.g. for CROSS-pkg-config
 
 DEBUG_CFLAGS = -g3 -DDEBUG -Wall -Wextra -Wconversion -Wno-sign-conversion \
   -fsanitize=undefined -fsanitize-undefined-trap-on-error
-WIN32_CFLAGS = -fno-builtin -fwhole-program -fno-asynchronous-unwind-tables
+WIN32_CFLAGS = -fno-builtin -fno-asynchronous-unwind-tables
 WIN32_LIBS   = -s -nostdlib -Wl,--gc-sections -lkernel32
-LINUX_CFLAGS = -fno-builtin -fno-pie -fwhole-program \
-  -fno-asynchronous-unwind-tables
+LINUX_CFLAGS = -fno-builtin -fno-pie -fno-asynchronous-unwind-tables
 LINUX_LIBS   = -s -no-pie -nostdlib -Wl,--gc-sections
 
 pkg-config.exe: win32_main.c cmdline.c miniwin32.h u-config.c

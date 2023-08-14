@@ -174,7 +174,6 @@ static int os_main(int argc, char **argv, char **envp)
     return 0;
 }
 
-__attribute((externally_visible))  // for -fwhole-program
 void entrypoint(char **stack)
 {
     long   argc = ((long *)stack)[0];

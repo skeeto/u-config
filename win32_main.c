@@ -36,9 +36,9 @@
   }
 #elif __GNUC__
   #ifdef __cplusplus
-    #define EXTERN extern "C" __attribute__((externally_visible))
+    #define EXTERN extern "C"
   #else
-    #define EXTERN __attribute__((externally_visible))
+    #define EXTERN
   #endif
   #if __i686__
     #define ENTRYPOINT EXTERN __attribute__((force_align_arg_pointer))
