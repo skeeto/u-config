@@ -30,7 +30,7 @@ static long syscall6(long, long, long, long, long, long, long);
 __attribute__((section(".text.memset")))
 void *memset(void *d, int c, unsigned long n)
 {
-    volatile char *dst = d;
+    char *dst = d;
     for (; n; n--) {
         *dst++ = (char)c;
     }
@@ -40,7 +40,7 @@ void *memset(void *d, int c, unsigned long n)
 __attribute__((section(".text.memcpy")))
 void *memcpy(void *d, const void *s, unsigned long n)
 {
-    volatile char *dst = d;
+    char *dst = d;
     for (const char *src = s; n; n--) {
         *dst++ = *src++;
     }
