@@ -95,8 +95,13 @@ static Str fromenv_(Arena *a, const wchar_t *name)
     // NOTE: maximum environment variable size is 2**15-1, so this
     // cannot fail if the variable actually exists
     static wchar_t w[1<<15];
+    // NOTE: A zero return is either an empty variable or an unset
+    // variable. Only GetLastError can distinguish them, but the first
+    // case does not clear the last error. Therefore we must clear the
+    // error before GetEnvironmentVariable in order to tell them apart.
+    SetLastError(0);
     DWORD wlen = GetEnvironmentVariableW(name, w, sizeof(w));
-    if (!wlen) {
+    if (!wlen && ERROR_ENVVAR_NOT_FOUND==GetLastError()) {
         Str r = {0};
         return r;
     }

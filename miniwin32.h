@@ -39,6 +39,8 @@ typedef unsigned DWORD;
 #define STD_ERROR_HANDLE  -12
 #define STD_OUTPUT_HANDLE -11
 
+#define ERROR_ENVVAR_NOT_FOUND 0xcb
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -54,11 +56,13 @@ __declspec(dllimport) BOOL __stdcall GetConsoleMode(HANDLE, DWORD *);
 __declspec(dllimport) DWORD __stdcall GetEnvironmentVariableW(
     const wchar_t *, wchar_t *, DWORD);
 __declspec(dllimport) DWORD __stdcall GetFileSize(HANDLE, DWORD *);
+__declspec(dllimport) DWORD __stdcall GetLastError(void);
 __declspec(dllimport) DWORD __stdcall GetModuleFileNameW(
     HANDLE, wchar_t *, DWORD);
 __declspec(dllimport) HANDLE __stdcall GetStdHandle(DWORD);
 __declspec(dllimport) void *__stdcall MapViewOfFile(
     HANDLE, DWORD, DWORD, DWORD, size_t);
+__declspec(dllimport) void __stdcall SetLastError(DWORD);
 __declspec(dllimport) void *__stdcall VirtualAlloc(
     void *, size_t, DWORD, DWORD);
 __declspec(dllimport) int __stdcall WideCharToMultiByte(
