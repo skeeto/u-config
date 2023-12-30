@@ -102,6 +102,8 @@ int main(int argc, char **argv)
         conf.sys_libpath = S(PKG_CONFIG_SYSTEM_LIBRARY_PATH);
     }
     conf.top_builddir  = fromcstr_(getenv("PKG_CONFIG_TOP_BUILD_DIR"));
+    conf.print_sysinc  = fromcstr_(getenv("PKG_CONFIG_ALLOW_SYSTEM_CFLAGS"));
+    conf.print_syslib  = fromcstr_(getenv("PKG_CONFIG_ALLOW_SYSTEM_LIBS"));
 
     appmain(conf);
 

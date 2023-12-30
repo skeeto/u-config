@@ -384,8 +384,20 @@ static void test_syspaths(void)
     }
     EXPECT("-DEXAMPLE -I/usr/include -lexample\n");
     SHOULDPASS {
+        Config copy = conf;
+        copy.print_sysinc = S("");
+        run(copy, S("--cflags"), S("--libs"), S("example"), E);
+    }
+    EXPECT("-DEXAMPLE -I/usr/include -lexample\n");
+    SHOULDPASS {
         run(conf, S("--cflags"), S("--libs"), S("example"),
                 S("--keep-system-libs"), E);
+    }
+    EXPECT("-DEXAMPLE -L/usr/lib -lexample\n");
+    SHOULDPASS {
+        Config copy = conf;
+        copy.print_syslib = S("");
+        run(copy, S("--cflags"), S("--libs"), S("example"), E);
     }
     EXPECT("-DEXAMPLE -L/usr/lib -lexample\n");
 }

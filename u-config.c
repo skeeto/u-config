@@ -63,6 +63,8 @@ typedef struct {
     Str top_builddir; // $PKG_CONFIG_TOP_BUILD_DIR or default
     Str sys_incpath;  // $PKG_CONFIG_SYSTEM_INCLUDE_PATH or default
     Str sys_libpath;  // $PKG_CONFIG_SYSTEM_LIBRARY_PATH or default
+    Str print_sysinc; // $PKG_CONFIG_ALLOW_SYSTEM_CFLAGS or empty
+    Str print_syslib; // $PKG_CONFIG_ALLOW_SYSTEM_LIBS or empty
     Bool define_prefix;
     Byte delim;
 } Config;
@@ -1794,8 +1796,8 @@ static void appmain(Config conf)
     Bool modversion = 0;
     VersionOp override_op = VersionOp_ERR;
     Str override_version = {0, 0};
-    Bool print_sysinc = 0;
-    Bool print_syslib = 0;
+    Bool print_sysinc = !!conf.print_sysinc.s;
+    Bool print_syslib = !!conf.print_syslib.s;
     Str variable = {0, 0};
 
     proc.define_prefix = conf.define_prefix;

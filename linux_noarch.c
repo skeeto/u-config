@@ -167,6 +167,10 @@ static int os_main(int argc, char **argv, char **envp)
             conf.sys_incpath = value;
         } else if (equals(name, S("PKG_CONFIG_SYSTEM_LIBRARY_PATH"))) {
             conf.sys_libpath = value;
+        } else if (equals(name, S("PKG_CONFIG_ALLOW_SYSTEM_CFLAGS"))) {
+            conf.print_sysinc = value;
+        } else if (equals(name, S("PKG_CONFIG_ALLOW_SYSTEM_LIBS"))) {
+            conf.print_syslib = value;
         }
     }
 

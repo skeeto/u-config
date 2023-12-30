@@ -182,6 +182,8 @@ int mainCRTStartup(void)
     conf.top_builddir = fromenv_(a, L"PKG_CONFIG_TOP_BUILD_DIR");
     conf.sys_incpath  = append2_(a, base, S(PKG_CONFIG_PREFIX "/include"));
     conf.sys_libpath  = append2_(a, base, S(PKG_CONFIG_PREFIX "/lib"));
+    conf.print_sysinc = fromenv_(a, L"PKG_CONFIG_ALLOW_SYSTEM_CFLAGS");
+    conf.print_syslib = fromenv_(a, L"PKG_CONFIG_ALLOW_SYSTEM_LIBS");
 
     appmain(conf);
     ExitProcess(0);

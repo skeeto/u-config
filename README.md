@@ -36,6 +36,8 @@ It still supports the important pkg-config run-time environment variables:
 * `PKG_CONFIG_TOP_BUILD_DIR`
 * `PKG_CONFIG_SYSTEM_INCLUDE_PATH`
 * `PKG_CONFIG_SYSTEM_LIBRARY_PATH`
+* `PKG_CONFIG_ALLOW_SYSTEM_CFLAGS`
+* `PKG_CONFIG_ALLOW_SYSTEM_LIBS`
 
 See the pkg-config documentation for details. It also closely follows
 pkg-config's idiosyncratic argument parsing — positional arguments are
