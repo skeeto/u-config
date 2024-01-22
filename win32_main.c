@@ -1,280 +1,232 @@
-// Win32 platform layer for u-config
+// Mingw-w64 Win32 platform layer for u-config
+// $ cc -nostartfiles -o pkg-config win32_main.c
 // This is free and unencumbered software released into the public domain.
 #include "u-config.c"
-#include "cmdline.c"
 #include "miniwin32.h"
+#include "cmdline.c"
 
 #ifndef PKG_CONFIG_PREFIX
 #  define PKG_CONFIG_PREFIX
 #endif
 
-#ifdef _MSC_VER
-  #ifdef __cplusplus
-    #define EXTERN extern "C"
-  #else
-    #define EXTERN
-  #endif
-  #define ENTRYPOINT EXTERN
-  #pragma comment(lib, "kernel32.lib")
-  #pragma comment(linker, "/subsystem:console")
-  EXTERN void *memset(void *, int, size_t);
-  #pragma function(memset)
-  EXTERN void *memset(void *d, int c, size_t n)
-  {
-      char *dst = (char *)d;
-      for (; n; n--) *dst++ = (char)c;
-      return d;
-  }
-  EXTERN void *memcpy(void *, const void *, size_t);
-  #pragma function(memcpy)
-  EXTERN void *memcpy(void *d, const void *s, size_t n)
-  {
-      char *dst = (char *)d;
-      char *src = (char *)s;
-      for (; n; n--) *dst++ = *src++;
-      return d;
-  }
-#elif __GNUC__
-  #ifdef __cplusplus
-    #define EXTERN extern "C"
-  #else
-    #define EXTERN
-  #endif
-  #if __i686__
-    #define ENTRYPOINT EXTERN __attribute__((force_align_arg_pointer))
-  #else
-    #define ENTRYPOINT EXTERN
-  #endif
-  // NOTE: These functions are required at higher GCC optimization
-  // levels. Placing them in their own section allows them to be
-  // ommitted via -Wl,--gc-sections when unused.
-  EXTERN
-  __attribute__((section(".text.memcpy")))
-  void *memcpy(void *d, const void *s, size_t n)
-  {
-      // NOTE: polyglot x86 and x64 inline assembly
-      void *r = d;
-      __asm volatile (
-          "rep movsb"
-          : "=D"(d), "=S"(s), "=c"(n)
-          : "0"(d), "1"(s), "2"(n)
-          : "memory"
-      );
-      return r;
-  }
-#endif
+static b32 error_is_console = 0;
 
-static Bool error_is_console = 0;
-
-static Arena newarena_(void)
+static arena newarena_(void)
 {
-    Arena arena = {0};
-    Size cap = 1<<28;
-    #if DEBUG
-    cap = 1<<21;
-    #endif
-    DWORD type = MEM_COMMIT | MEM_RESERVE;
-    arena.mem.s = (Byte *)VirtualAlloc(0, cap, type, PAGE_READWRITE);
-    arena.mem.len = arena.mem.s ? cap : 0;
-    shredfree(&arena);
+    arena arena = {0};
+    size cap = (size)1<<22;
+    i32 type = MEM_COMMIT | MEM_RESERVE;
+    arena.beg = VirtualAlloc(0, cap, type, PAGE_READWRITE);
+    if (!arena.beg) {
+        arena.beg = (byte *)16;  // aligned, non-null, zero-size arena
+        cap = 0;
+    }
+    arena.end = arena.beg + cap;
     return arena;
 }
 
-static Str fromwide_(Arena *a, wchar_t *w, Size wlen)
+static s8 fromwide_(arena *perm, c16 *w, i32 wlen)
 {
     // NOTE: consider replacing the Win32 UTF-8 encoder/decoder with an
     // embedded WTF-8 encoder/decoder
-    int len = WideCharToMultiByte(CP_UTF8, 0, w, wlen, 0, 0, 0, 0);
-    Str s = newstr(a, len);
-    WideCharToMultiByte(CP_UTF8, 0, w, wlen, (char *)s.s, s.len, 0, 0);
+    i32 len = WideCharToMultiByte(CP_UTF8, 0, w, wlen, 0, 0, 0, 0);
+    s8 s = news8(perm, len);
+    WideCharToMultiByte(CP_UTF8, 0, w, wlen, s.s, len, 0, 0);
     return s;
 }
 
-static Str fromenv_(Arena *a, const wchar_t *name)
+static s8 fromenv_(arena *perm, c16 *name)
 {
     // NOTE: maximum environment variable size is 2**15-1, so this
     // cannot fail if the variable actually exists
-    static wchar_t w[1<<15];
+    static c16 w[1<<15];
     // NOTE: A zero return is either an empty variable or an unset
     // variable. Only GetLastError can distinguish them, but the first
     // case does not clear the last error. Therefore we must clear the
     // error before GetEnvironmentVariable in order to tell them apart.
     SetLastError(0);
-    DWORD wlen = GetEnvironmentVariableW(name, w, COUNTOF(w));
+    i32 wlen = GetEnvironmentVariableW(name, w, countof(w));
     if (!wlen && ERROR_ENVVAR_NOT_FOUND==GetLastError()) {
-        Str r = {0};
+        s8 r = {0};
         return r;
     }
-    return fromwide_(a, w, wlen);
+    return fromwide_(perm, w, wlen);
 }
 
-static Str installdir_(Arena *a)
+static s8 installdir_(arena *perm)
 {
-    wchar_t exe[MAX_PATH];
-    Size len = GetModuleFileNameW(0, exe, MAX_PATH);
-    for (Size i = 0; i < len; i++) {
+    c16 exe[MAX_PATH];
+    i32 len = GetModuleFileNameW(0, exe, countof(exe));
+    for (size i = 0; i < len; i++) {
         if (exe[i] == '\\') {
             exe[i] = '/';
         }
     }
-    Str path = fromwide_(a, exe, len);
+    s8 path = fromwide_(perm, exe, len);
     return dirname(dirname(path));
 }
 
-static Str append2_(Arena *a, Str pre, Str suf)
+static s8 append2_(arena *perm, s8 pre, s8 suf)
 {
-    Str s = newstr(a, pre.len+suf.len);
-    copy(copy(s, pre), suf);
+    s8 s = news8(perm, pre.len+suf.len);
+    s8copy(s8copy(s, pre), suf);
     return s;
 }
 
-static Str makepath_(Arena *a, Str base, Str lib, Str share)
+static s8 makepath_(arena *perm, s8 base, s8 lib, s8 share)
 {
-    Str delim = S(";");
-    Size len  = base.len + lib.len + delim.len + base.len + share.len;
-    Str s = newstr(a, len);
-    Str r = copy(s, base);
-        r = copy(r, lib);
-        r = copy(r, delim);
-        r = copy(r, base);
-            copy(r, share);
+    s8 delim = S(";");
+    size len = base.len + lib.len + delim.len + base.len + share.len;
+    s8 s = news8(perm, len);
+    s8 r = s8copy(s, base);
+       r = s8copy(r, lib);
+       r = s8copy(r, delim);
+       r = s8copy(r, base);
+           s8copy(r, share);
     return s;
 }
 
-static Str fromcstr_(char *z)
+static s8 fromcstr_(u8 *z)
 {
-    Str s = {(Byte *)z, 0};
+    s8 s = {0};
+    s.s = z;
     if (s.s) {
         for (; s.s[s.len]; s.len++) {}
     }
     return s;
 }
 
-ENTRYPOINT
-int mainCRTStartup(void)
+static config *newconfig_()
 {
-    Config conf = {0};
-    conf.delim = ';';
-    conf.define_prefix = 1;
-    conf.arena = newarena_();
-    Arena *a = &conf.arena;
-
-    DWORD dummy;
-    HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
-    error_is_console = GetConsoleMode(err, &dummy);
-
-    char **argv = (char **)allocarray(a, SIZEOF(*argv), CMDLINE_ARGV_MAX);
-    unsigned short *cmdline = (unsigned short *)GetCommandLineW();
-    conf.nargs = cmdline_to_argv8(cmdline, argv) - 1;
-    conf.args = (Str *)allocarray(a, SIZEOF(Str), conf.nargs);
-    for (Size i = 0; i < conf.nargs; i++) {
-        conf.args[i] = fromcstr_(argv[i+1]);
-    }
-
-    Str base = installdir_(a);
-    conf.envpath = fromenv_(a, L"PKG_CONFIG_PATH");
-    conf.fixedpath = fromenv_(a, L"PKG_CONFIG_LIBDIR");
-    if (!conf.fixedpath.s) {
-        Str lib   = S(PKG_CONFIG_PREFIX "/lib/pkgconfig");
-        Str share = S(PKG_CONFIG_PREFIX "/share/pkgconfig");
-        conf.fixedpath = makepath_(a, base, lib, share);
-    }
-    conf.top_builddir = fromenv_(a, L"PKG_CONFIG_TOP_BUILD_DIR");
-    conf.sys_incpath  = append2_(a, base, S(PKG_CONFIG_PREFIX "/include"));
-    conf.sys_libpath  = append2_(a, base, S(PKG_CONFIG_PREFIX "/lib"));
-    conf.print_sysinc = fromenv_(a, L"PKG_CONFIG_ALLOW_SYSTEM_CFLAGS");
-    conf.print_syslib = fromenv_(a, L"PKG_CONFIG_ALLOW_SYSTEM_LIBS");
-
-    appmain(conf);
-    ExitProcess(0);
+    config *conf = 0;
+    arena perm = newarena_();
+    conf = new(&perm, config, 1);
+    conf->perm = perm;
+    return conf;
 }
 
-static MapFileResult os_mapfile(Arena *a, Str path)
+__attribute((force_align_arg_pointer))
+void mainCRTStartup(void)
 {
-    (void)a;
-    ASSERT(path.len > 0);
-    ASSERT(!path.s[path.len-1]);
+    config *conf = newconfig_();
+    conf->delim = ';';
+    conf->define_prefix = 1;
+    arena *perm = &conf->perm;
 
-    wchar_t wpath[MAX_PATH];
-    int wlen = MultiByteToWideChar(
-        CP_UTF8, 0, (char *)path.s, path.len, wpath, MAX_PATH
+    i32 dummy;
+    i32 err = GetStdHandle(STD_ERROR_HANDLE);
+    error_is_console = GetConsoleMode(err, &dummy);
+
+    u8 **argv = new(perm, u8 *, CMDLINE_ARGV_MAX);
+    c16 *cmdline = GetCommandLineW();
+    conf->nargs = cmdline_to_argv8(cmdline, argv) - 1;
+    conf->args = new(perm, s8, conf->nargs);
+    for (size i = 0; i < conf->nargs; i++) {
+        conf->args[i] = fromcstr_(argv[i+1]);
+    }
+
+    s8 base = installdir_(perm);
+    conf->envpath = fromenv_(perm, L"PKG_CONFIG_PATH");
+    conf->fixedpath = fromenv_(perm, L"PKG_CONFIG_LIBDIR");
+    if (!conf->fixedpath.s) {
+        s8 lib   = S(PKG_CONFIG_PREFIX "/lib/pkgconfig");
+        s8 share = S(PKG_CONFIG_PREFIX "/share/pkgconfig");
+        conf->fixedpath = makepath_(perm, base, lib, share);
+    }
+    conf->top_builddir = fromenv_(perm, L"PKG_CONFIG_TOP_BUILD_DIR");
+    conf->sys_incpath  = append2_(perm, base, S(PKG_CONFIG_PREFIX "/include"));
+    conf->sys_libpath  = append2_(perm, base, S(PKG_CONFIG_PREFIX "/lib"));
+    conf->print_sysinc = fromenv_(perm, L"PKG_CONFIG_ALLOW_SYSTEM_CFLAGS");
+    conf->print_syslib = fromenv_(perm, L"PKG_CONFIG_ALLOW_SYSTEM_LIBS");
+
+    uconfig(conf);
+    ExitProcess(0);
+    assert(0);
+}
+
+static filemap os_mapfile(arena *perm, s8 path)
+{
+    assert(path.len > 0);
+    assert(!path.s[path.len-1]);
+
+    filemap r = {0};
+
+    c16 wpath[MAX_PATH];
+    i32 wlen = MultiByteToWideChar(
+        CP_UTF8, 0, path.s, (i32)path.len, wpath, countof(wpath)
     );
     if (!wlen) {
-        MapFileResult r = {{0, 0}, MapFile_NOTFOUND};
+        r.status = filemap_NOTFOUND;
         return r;
     }
 
-    HANDLE h = CreateFileW(
+    i32 h = CreateFileW(
         wpath,
         GENERIC_READ,
-        FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
+        FILE_SHARE_ALL,
         0,
         OPEN_EXISTING,
         FILE_ATTRIBUTE_NORMAL,
         0
     );
     if (h == INVALID_HANDLE_VALUE) {
-        MapFileResult r = {{0, 0}, MapFile_NOTFOUND};
+        r.status = filemap_NOTFOUND;
         return r;
     }
 
-    DWORD hi, lo = GetFileSize(h, &hi);
-    if (hi || lo>Size_MAX) {
-        CloseHandle(h);
-        MapFileResult r = {{0, 0}, MapFile_READERR};
-        return r;
-    } else if (!lo) {
-        CloseHandle(h);
-        // Cannot map an empty file, so use the arena for a zero-size
-        // allocation, distinguishing it from a null string.
-        MapFileResult r = {newstr(a, 0), MapFile_OK};
-        return r;
+    r.data.s = (u8 *)perm->beg;
+    size cap = perm->end - perm->beg;
+    while (r.data.len < cap) {
+        i32 max = (i32)1<<30;
+        i32 len = cap-r.data.len<max ? (i32)(cap-r.data.len) : max;
+        ReadFile(h, r.data.s+r.data.len, len, &len, 0);
+        if (len < 1) {
+            break;
+        }
+        r.data.len += len;
     }
-
-    HANDLE map = CreateFileMappingA(h, 0, PAGE_READONLY, 0, lo, 0);
     CloseHandle(h);
-    if (!map) {
-        MapFileResult r = {{0, 0}, MapFile_READERR};
+
+    if (r.data.len == cap) {
+        // If it filled all available space, assume the file is too large.
+        r.status = filemap_READERR;
         return r;
     }
 
-    void *p = MapViewOfFile(map, FILE_MAP_READ, 0, 0, lo);
-    CloseHandle(map);
-    if (!p) {
-        MapFileResult r = {{0, 0}, MapFile_READERR};
-        return r;
-    }
-
-    MapFileResult r = {{(Byte *)p, (Size)lo}, MapFile_OK};
+    perm->beg += r.data.len;
+    r.status = filemap_OK;
     return r;
 }
 
 static void os_fail(void)
 {
     ExitProcess(1);
+    assert(0);
 }
 
-static void os_write(int fd, Str s)
+static void os_write(i32 fd, s8 s)
 {
-    ASSERT(fd==1 || fd==2);
-    DWORD id = fd==1 ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE;
-    HANDLE h = GetStdHandle(id);
-    DWORD n;
+    assert((i32)s.len == s.len);
+    assert(fd==1 || fd==2);
+    i32 id = fd==1 ? STD_OUTPUT_HANDLE : STD_ERROR_HANDLE;
+    i32 h = GetStdHandle(id);
 
     if (fd==2 && error_is_console) {
-        static wchar_t tmp[1<<12];
-        int len = MultiByteToWideChar(
-            CP_UTF8, 0, (char *)s.s, s.len, tmp, sizeof(tmp)
+        static c16 tmp[1<<12];
+        i32 len = MultiByteToWideChar(
+            CP_UTF8, 0, s.s, (i32)s.len, tmp, countof(tmp)
         );
         if (len) {
-            WriteConsoleW(h, tmp, len, &n, 0);
+            i32 dummy;
+            WriteConsoleW(h, tmp, len, &dummy, 0);
             return;
         }
         // Too large, fallback to WriteFile
     }
 
-    BOOL r = WriteFile(h, s.s, s.len, &n, 0);
-    if (!r || (Size)n!=s.len) {
+    i32 dummy;
+    b32 r = WriteFile(h, s.s, (i32)s.len, &dummy, 0);
+    if (!r) {
         os_fail();
     }
 }

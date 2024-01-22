@@ -11,8 +11,8 @@ Notable features:
 * Windows as a first-class supported platform.
 
 * Highly portable to any machine. Supports a variety of compilers and
-  operating systems, ancient and new. Polyglot C and C++. Can be built
-  without libc, which is handy for bootstrapping.
+  operating systems, ancient and new. Can be built without libc, which is
+  handy for bootstrapping.
 
 * Trivial, fast build. No messing around with GNU Autotools, or any build
   system for that matter.
@@ -74,15 +74,11 @@ probably interacting with tools that do not. It outputs arguments encoded
 in UTF-8 regardless of the system code page. Do not link a C runtime (CRT)
 in this configuration.
 
-    $ gcc -Os -nostartfiles -o pkg-config win32_main.c
+    $ cc -Os -nostartfiles -o pkg-config win32_main.c
 
-Or with MSVC (automatically omits a CRT):
+Or with MSVC:
 
-    $ cl /O2 /Fe:pkg-config win32_main.c
-
-With pre-2015 MSVC, compile as C++:
-
-    $ cl /TP /O2 /Fe:pkg-config win32_main.c
+    $ cl /GS- /O2 /Os /Fe:pkg-config msvc_main.c
 
 The Makefile documents compiler options for a more aggressively optimized
 GCC-based build.
@@ -171,19 +167,12 @@ same behavior as the generic platform.
 
 ### Debugging
 
-The `DEBUG` macro enables assertions. Suggested debug build, which is
-intended to be run under a debugger:
+Suggested debug build, intended to be run under a debugger:
 
-    $ cc -g3 -DDEBUG -Wall -Wextra -Wconversion -Wno-sign-conversion \
-         -fsanitize=undefined -fsanitize-undefined-trap-on-error \
-         PLATFORM_main.c
+    $ cc -g3 -Wall -Wextra -Wconversion -Wno-sign-conversion \
+         -fsanitize=undefined -fsanitize-trap PLATFORM_main.c
 
-For MSVC with maximum run-time error checks (RTC):
-
-    $ cl /Z7 /DDEBUG /W4 /RTCcsu PLATFORM_main.c
-
-RTC and Address Sanitizer (`/fsanitize=address`) are mutually exclusive,
-and the former is more useful for u-config.
+Enabling Undefined Behavior Sanitizer also enables assertions.
 
 ### Test suite
 
@@ -193,10 +182,6 @@ build and run `test_main.c` as a platform, or use the suggested test
 configuration in the Makefile (set `EXE=.exe` on Windows):
 
     $ make check
-
-For MSVC:
-
-    $ cl /Z7 /W4 /RTCcsu test_main.c
 
 ### Fuzz testing
 

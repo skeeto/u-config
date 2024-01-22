@@ -18,34 +18,13 @@
 #endif
 
 // Arch-specific definitions, defined by the includer. Also requires
-// macro definitions for SYS_write, SYS_open, SYS_close, SYS_fstat,
+// macro definitions for SYS_read, SYS_write, SYS_open, SYS_close,
 // SYS_mmap, SYS_exit. Arch-specific _start calls the arch-agnostic
 // entrypoint() with the process entry stack pointer.
-struct stat;  // only needs st_size
 static long syscall1(long, long);
 static long syscall2(long, long, long);
 static long syscall3(long, long, long, long);
 static long syscall6(long, long, long, long, long, long, long);
-
-__attribute__((section(".text.memset")))
-void *memset(void *d, int c, unsigned long n)
-{
-    char *dst = d;
-    for (; n; n--) {
-        *dst++ = (char)c;
-    }
-    return d;
-}
-
-__attribute__((section(".text.memcpy")))
-void *memcpy(void *d, const void *s, unsigned long n)
-{
-    char *dst = d;
-    for (const char *src = s; n; n--) {
-        *dst++ = *src++;
-    }
-    return d;
-}
 
 static void os_fail(void)
 {
@@ -53,137 +32,139 @@ static void os_fail(void)
     __builtin_unreachable();
 }
 
-static void os_write(int fd, Str s)
+static void os_write(i32 fd, s8 s)
 {
-    ASSERT(fd==1 || fd==2);
+    assert(fd==1 || fd==2);
     while (s.len) {
         long r = syscall3(SYS_write, fd, (long)s.s, s.len);
         if (r < 0) {
             os_fail();
         }
-        s = cuthead(s, (Size)r);
+        s = cuthead(s, (size)r);
     }
 }
 
-static MapFileResult os_mapfile(Arena *a, Str path)
+static filemap os_mapfile(arena *perm, s8 path)
 {
-    (void)a;
-    ASSERT(path.s);
-    ASSERT(path.len);
-    ASSERT(!path.s[path.len-1]);
+    assert(path.s);
+    assert(path.len);
+    assert(!path.s[path.len-1]);
+
+    filemap r = {0};
 
     long fd = syscall2(SYS_open, (long)path.s, 0);
     if (fd < 0) {
-        MapFileResult r = {.status=MapFile_NOTFOUND};
+        r.status = filemap_NOTFOUND;
         return r;
     }
 
-    struct stat sb;
-    if (syscall2(SYS_fstat, fd, (long)&sb) < 0) {
-        syscall1(SYS_close, fd);
-        MapFileResult r = {.status=MapFile_READERR};
-        return r;
+    r.data.s = (u8 *)perm->beg;
+    size cap = perm->end - perm->beg;
+    while (r.data.len < cap) {
+        u8 *dst = r.data.s + r.data.len;
+        long len = syscall3(SYS_read, fd, (long)dst, cap-r.data.len);
+        if (len < 1) {
+            break;
+        }
+        r.data.len += len;
     }
-
-    if (sb.st_size > Size_MAX) {
-        syscall1(SYS_close, fd);
-        MapFileResult r = {.status=MapFile_READERR};
-        return r;
-    }
-    Size size = (Size)sb.st_size;
-
-    if (!size) {
-        syscall1(SYS_close, fd);
-        // Cannot map an empty file, so use the arena for a zero-size
-        // allocation, distinguishing it from a null string.
-        MapFileResult r = {newstr(a, 0), .status=MapFile_OK};
-        return r;
-    }
-
-    unsigned long p = syscall6(SYS_mmap, 0, size, 1, 2, fd, 0);
     syscall1(SYS_close, fd);
-    if (p > -4096UL) {
-        MapFileResult r = {.status=MapFile_READERR};
+
+    if (r.data.len == cap) {
+        // If it filled all available space, assume the file is too large
+        r.status = filemap_READERR;
         return r;
     }
 
-    MapFileResult r = {{(Byte *)p, size}, .status=MapFile_OK};
+    perm->beg += r.data.len;
+    r.status = filemap_OK;
     return r;
 }
 
-static Str fromcstr_(char *z)
+static s8 fromcstr_(u8 *z)
 {
-    Str s = {(Byte *)z, 0};
+    s8 s = {0};
+    s.s = (u8 *)z;
     if (s.s) {
         for (; s.s[s.len]; s.len++) {}
     }
     return s;
 }
 
-static Arena newarena_(void)
+static arena newarena_(void)
 {
-    Size size = 1 << 21;
-    unsigned long p = syscall6(SYS_mmap, 0, size, 3, 0x22, -1, 0);
+    arena a = {0};
+    size cap = 1<<22;
+    unsigned long p = syscall6(SYS_mmap, 0, cap, 3, 0x22, -1, 0);
     if (p > -4096UL) {
-        Arena r = {0};
-        return r;
+        a.beg = (byte *)16;  // aligned, non-null, zero-size arena
+        cap = 0;
+    } else {
+        a.beg = (byte *)p;
     }
-    Arena r = {{(Byte *)p, size}, 0};
-    return r;
+    a.end = a.beg + cap;
+    return a;
 }
 
-static int os_main(int argc, char **argv, char **envp)
+static config *newconfig_(void)
 {
-    Config conf = {0};
-    conf.delim = ':';
-    conf.arena = newarena_();
+    arena perm = newarena_();
+    config *conf = new(&perm, config, 1);
+    conf->perm = perm;
+    return conf;
+}
+
+static i32 os_main(i32 argc, u8 **argv, u8 **envp)
+{
+    config *conf = newconfig_();
+    conf->delim = ':';
 
     if (argc) {
         argc--;
         argv++;
     }
-    conf.nargs = argc;
-    conf.args = allocarray(&conf.arena, SIZEOF(Str), argc);
-    for (int i = 0; i < argc; i++) {
-        conf.args[i] = fromcstr_(argv[i]);
+    conf->nargs = argc;
+    conf->args = new(&conf->perm, s8, argc);
+    for (i32 i = 0; i < argc; i++) {
+        conf->args[i] = fromcstr_(argv[i]);
     }
 
-    conf.fixedpath = S(PKG_CONFIG_LIBDIR);
-    conf.sys_incpath = S(PKG_CONFIG_SYSTEM_INCLUDE_PATH);
-    conf.sys_libpath = S(PKG_CONFIG_SYSTEM_LIBRARY_PATH);
+    conf->fixedpath = S(PKG_CONFIG_LIBDIR);
+    conf->sys_incpath = S(PKG_CONFIG_SYSTEM_INCLUDE_PATH);
+    conf->sys_libpath = S(PKG_CONFIG_SYSTEM_LIBRARY_PATH);
 
-    for (char **v = envp; *v; v++) {
-        Cut c = cut(fromcstr_(*v), '=');
-        Str name = c.head;
-        Str value = c.tail;
+    for (u8 **v = envp; *v; v++) {
+        cut c = s8cut(fromcstr_(*v), '=');
+        s8 name = c.head;
+        s8 value = c.tail;
 
-        if (equals(name, S("PKG_CONFIG_PATH"))) {
-            conf.envpath = value;
-        } else if (equals(name, S("PKG_CONFIG_LIBDIR"))) {
-            conf.fixedpath = value;
-        } else if (equals(name, S("PKG_CONFIG_TOP_BUILD_DIR"))) {
-            conf.top_builddir = value;
-        } else if (equals(name, S("PKG_CONFIG_SYSTEM_INCLUDE_PATH"))) {
-            conf.sys_incpath = value;
-        } else if (equals(name, S("PKG_CONFIG_SYSTEM_LIBRARY_PATH"))) {
-            conf.sys_libpath = value;
-        } else if (equals(name, S("PKG_CONFIG_ALLOW_SYSTEM_CFLAGS"))) {
-            conf.print_sysinc = value;
-        } else if (equals(name, S("PKG_CONFIG_ALLOW_SYSTEM_LIBS"))) {
-            conf.print_syslib = value;
+        if (s8equals(name, S("PKG_CONFIG_PATH"))) {
+            conf->envpath = value;
+        } else if (s8equals(name, S("PKG_CONFIG_LIBDIR"))) {
+            conf->fixedpath = value;
+        } else if (s8equals(name, S("PKG_CONFIG_TOP_BUILD_DIR"))) {
+            conf->top_builddir = value;
+        } else if (s8equals(name, S("PKG_CONFIG_SYSTEM_INCLUDE_PATH"))) {
+            conf->sys_incpath = value;
+        } else if (s8equals(name, S("PKG_CONFIG_SYSTEM_LIBRARY_PATH"))) {
+            conf->sys_libpath = value;
+        } else if (s8equals(name, S("PKG_CONFIG_ALLOW_SYSTEM_CFLAGS"))) {
+            conf->print_sysinc = value;
+        } else if (s8equals(name, S("PKG_CONFIG_ALLOW_SYSTEM_LIBS"))) {
+            conf->print_syslib = value;
         }
     }
 
-    appmain(conf);
+    uconfig(conf);
     return 0;
 }
 
-void entrypoint(char **stack)
+void entrypoint(long *stack)
 {
-    long   argc = ((long *)stack)[0];
-    char **argv = (char **)stack + 1;
-    char **envp = argv + argc + 1;
-    int status  = os_main((int)argc, argv, envp);
+    i32  argc   = (i32)stack[0];
+    u8 **argv   = (u8 **)stack + 1;
+    u8 **envp   = argv + argc + 1;
+    i32  status = os_main(argc, argv, envp);
     syscall1(SYS_exit, status);
     __builtin_unreachable();
 }

@@ -1,77 +1,50 @@
-// Win32 API: windows.h replacement, halves build times
+// Win32 types, constants, and declarations (replaces windows.h)
+// This is free and unencumbered software released into the public domain.
 
-typedef int BOOL;
-typedef void *HANDLE;
-typedef unsigned DWORD;
-#if __GNUC__  // in MSVC size_t is a built-in type
-  typedef __SIZE_TYPE__ size_t;
-#endif
-#if !__cplusplus || (_MSC_VER && !_NATIVE_WCHAR_T_DEFINED)
-  // NOTE: wchar_t is a built-in type in C++, except older versions of
-  // Visual Studio are not so C++-compliant without /Zc:wchar_t.
-  typedef unsigned short wchar_t;
-#endif
+typedef __SIZE_TYPE__  uptr;
+typedef unsigned short char16_t;
+typedef char16_t       c16;
 
-#define CP_UTF8 65001
+enum {
+    CP_UTF8 = 65001,
 
-#define FILE_ATTRIBUTE_NORMAL 0x80
+    FILE_ATTRIBUTE_NORMAL = 0x80,
 
-#define FILE_MAP_READ 4
+    FILE_SHARE_ALL = 7,
 
-#define FILE_SHARE_DELETE 4
-#define FILE_SHARE_READ   1
-#define FILE_SHARE_WRITE  2
+    GENERIC_READ = 0x80000000,
 
-#define GENERIC_READ 0x80000000
+    INVALID_HANDLE_VALUE = -1,
 
-#define INVALID_HANDLE_VALUE ((HANDLE)-1)
+    MAX_PATH = 260,
 
-#define MAX_PATH 260
+    MEM_COMMIT  = 0x1000,
+    MEM_RESERVE = 0x2000,
 
-#define MEM_COMMIT  0x1000
-#define MEM_RESERVE 0x2000
+    OPEN_EXISTING = 3,
 
-#define OPEN_EXISTING 3
+    PAGE_READWRITE = 4,
 
-#define PAGE_READONLY  2
-#define PAGE_READWRITE 4
+    STD_OUTPUT_HANDLE = -11,
+    STD_ERROR_HANDLE  = -12,
 
-#define STD_ERROR_HANDLE  -12
-#define STD_OUTPUT_HANDLE -11
+    ERROR_ENVVAR_NOT_FOUND = 0xcb
+};
 
-#define ERROR_ENVVAR_NOT_FOUND 0xcb
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-__declspec(dllimport) HANDLE __stdcall CreateFileW(
-    wchar_t *, DWORD, DWORD, void *, DWORD, DWORD, HANDLE);
-__declspec(dllimport) BOOL __stdcall CloseHandle(HANDLE);
-__declspec(dllimport) HANDLE __stdcall CreateFileMappingA(
-    HANDLE, void *, DWORD, DWORD, DWORD, char *);
-__declspec(dllimport) int __stdcall MultiByteToWideChar(
-    unsigned, DWORD, char *, int, wchar_t *, int);
-__declspec(dllimport) wchar_t *__stdcall GetCommandLineW(void);
-__declspec(dllimport) BOOL __stdcall GetConsoleMode(HANDLE, DWORD *);
-__declspec(dllimport) DWORD __stdcall GetEnvironmentVariableW(
-    const wchar_t *, wchar_t *, DWORD);
-__declspec(dllimport) DWORD __stdcall GetFileSize(HANDLE, DWORD *);
-__declspec(dllimport) DWORD __stdcall GetLastError(void);
-__declspec(dllimport) DWORD __stdcall GetModuleFileNameW(
-    HANDLE, wchar_t *, DWORD);
-__declspec(dllimport) HANDLE __stdcall GetStdHandle(DWORD);
-__declspec(dllimport) void *__stdcall MapViewOfFile(
-    HANDLE, DWORD, DWORD, DWORD, size_t);
-__declspec(dllimport) void __stdcall SetLastError(DWORD);
-__declspec(dllimport) void *__stdcall VirtualAlloc(
-    void *, size_t, DWORD, DWORD);
-__declspec(dllimport) int __stdcall WideCharToMultiByte(
-    unsigned, DWORD, wchar_t *, int, char *, int, char *, BOOL *);
-__declspec(dllimport) BOOL __stdcall WriteConsoleW(
-    HANDLE, wchar_t *, DWORD, DWORD *, void *);
-__declspec(dllimport) BOOL __stdcall WriteFile(
-    HANDLE, void *, DWORD, DWORD *, void *);
-__declspec(dllimport) __declspec(noreturn) void __stdcall ExitProcess(DWORD);
-#ifdef __cplusplus
-}
-#endif
+#define W32(r) __declspec(dllimport) r __stdcall
+W32(b32)    CloseHandle(uptr);
+W32(i32)    CreateFileW(c16 *, i32, i32, uptr, i32, i32, i32);
+W32(void)   ExitProcess(i32);
+W32(c16 *)  GetCommandLineW(void);
+W32(b32)    GetConsoleMode(uptr, i32 *);
+W32(i32)    GetEnvironmentVariableW(c16 *, c16 *, i32);
+W32(u32)    GetLastError(void);
+W32(i32)    GetModuleFileNameW(uptr, c16 *, i32);
+W32(i32)    GetStdHandle(i32);
+W32(i32)    MultiByteToWideChar(i32, i32, u8 *, i32, c16 *, i32);
+W32(b32)    ReadFile(uptr, u8 *, i32, i32 *, uptr);
+W32(void)   SetLastError(u32);
+W32(byte *) VirtualAlloc(uptr, size, i32, i32);
+W32(i32)    WideCharToMultiByte(i32, i32, c16 *, i32, u8 *, i32, uptr, uptr);
+W32(b32)    WriteConsoleW(uptr, c16 *, i32, i32 *, uptr);
+W32(b32)    WriteFile(uptr, u8 *, i32, i32 *, uptr);

@@ -1,10 +1,17 @@
 // Generic C platform layer for u-config
 // This is free and unencumbered software released into the public domain.
+#define _CRT_SECURE_NO_WARNINGS
+#ifndef __PTRDIFF_TYPE__  // not GCC-like?
+#  include <stddef.h>
+#  define __PTRDIFF_TYPE__         ptrdiff_t
+#  define __builtin_unreachable()  *(volatile int *)0 = 0
+#  define __attribute(x)
+#endif
 #include "u-config.c"
 
-#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if _WIN32
 #  define PATHDELIM ";"
@@ -44,104 +51,105 @@ static const char pkg_config_path[] =
     #endif
 ;
 
-static Str fromcstr_(char *z)
+static s8 fromcstr_(char *z)
 {
-    Str s = {(Byte *)z, 0};
-    if (s.s) {
-        for (; s.s[s.len]; s.len++) {}
-    }
+    s8 s = {0};
+    s.s = (u8 *)z;
+    s.len = z ? strlen(z) : 0;
     return s;
 }
 
-static Arena newarena_(void)
+static arena newarena_(void)
 {
-    // 16-bit    : allocate  16 KiB
-    // 32/64-bit : allocate 256 MiB
-    int exp = 7 * SIZEOF(int);
-    Size cap = (Size)1 << exp;
-    #ifdef DEBUG
-    // Reduce for fuzzing and faster debugging
-    cap = (Size)1 << 21;
-    #endif
+    size cap = (size)1<<22;
+    arena a = {0};
+    a.beg = malloc(cap);
+    if (!a.beg) {
+        a.beg = (byte *)16;  // aligned, non-null, zero-size arena
+        cap = 0;
+    }
+    a.end = a.beg + cap;
+    return a;
+}
 
-    Arena arena = {0};
-    arena.mem.s = (Byte *)malloc(cap);
-    arena.mem.len = arena.mem.s ? cap : 0;
-    shredfree(&arena);
-    return arena;
+static config *newconfig_(void)
+{
+    arena perm = newarena_();
+    config *conf = new(&perm, config, 1);
+    conf->perm = perm;
+    return conf;
 }
 
 int main(int argc, char **argv)
 {
-    Config conf = {0};
-    conf.delim = PATHDELIM[0];
-    conf.define_prefix = PKG_CONFIG_DEFINE_PREFIX;
-    conf.arena = newarena_();
+    config *conf = newconfig_();
+    conf->delim = PATHDELIM[0];
+    conf->define_prefix = PKG_CONFIG_DEFINE_PREFIX;
 
     if (argc) {
         argc--;
         argv++;
     }
-    conf.args = (Str *)allocarray(&conf.arena, SIZEOF(Str), argc);
-    conf.nargs = argc;
+    conf->args = new(&conf->perm, s8, argc);
+    conf->nargs = argc;
     for (int i = 0; i < argc; i++) {
-        conf.args[i] = fromcstr_(argv[i]);
+        conf->args[i] = fromcstr_(argv[i]);
     }
 
-    conf.envpath = fromcstr_(getenv("PKG_CONFIG_PATH"));
-    conf.fixedpath = fromcstr_(getenv("PKG_CONFIG_LIBDIR"));
-    if (!conf.fixedpath.s) {
-        conf.fixedpath = S(pkg_config_path);
+    conf->envpath = fromcstr_(getenv("PKG_CONFIG_PATH"));
+    conf->fixedpath = fromcstr_(getenv("PKG_CONFIG_LIBDIR"));
+    if (!conf->fixedpath.s) {
+        conf->fixedpath = S(pkg_config_path);
     }
-    conf.sys_incpath = fromcstr_(getenv("PKG_CONFIG_SYSTEM_INCLUDE_PATH"));
-    if (!conf.sys_incpath.s) {
-        conf.sys_incpath = S(PKG_CONFIG_SYSTEM_INCLUDE_PATH);
+    conf->sys_incpath = fromcstr_(getenv("PKG_CONFIG_SYSTEM_INCLUDE_PATH"));
+    if (!conf->sys_incpath.s) {
+        conf->sys_incpath = S(PKG_CONFIG_SYSTEM_INCLUDE_PATH);
     }
-    conf.sys_libpath = fromcstr_(getenv("PKG_CONFIG_SYSTEM_LIBRARY_PATH"));
-    if (!conf.sys_libpath.s) {
-        conf.sys_libpath = S(PKG_CONFIG_SYSTEM_LIBRARY_PATH);
+    conf->sys_libpath = fromcstr_(getenv("PKG_CONFIG_SYSTEM_LIBRARY_PATH"));
+    if (!conf->sys_libpath.s) {
+        conf->sys_libpath = S(PKG_CONFIG_SYSTEM_LIBRARY_PATH);
     }
-    conf.top_builddir  = fromcstr_(getenv("PKG_CONFIG_TOP_BUILD_DIR"));
-    conf.print_sysinc  = fromcstr_(getenv("PKG_CONFIG_ALLOW_SYSTEM_CFLAGS"));
-    conf.print_syslib  = fromcstr_(getenv("PKG_CONFIG_ALLOW_SYSTEM_LIBS"));
+    conf->top_builddir = fromcstr_(getenv("PKG_CONFIG_TOP_BUILD_DIR"));
+    conf->print_sysinc = fromcstr_(getenv("PKG_CONFIG_ALLOW_SYSTEM_CFLAGS"));
+    conf->print_syslib = fromcstr_(getenv("PKG_CONFIG_ALLOW_SYSTEM_LIBS"));
 
-    appmain(conf);
+    uconfig(conf);
 
-    #ifdef DEBUG
-    free(conf.arena.mem.s);  // look ma, no memory leaks
-    #endif
     return ferror(stdout);
 }
 
-static MapFileResult os_mapfile(Arena *a, Str path)
+static filemap os_mapfile(arena *perm, s8 path)
 {
-    ASSERT(path.len > 0);
-    ASSERT(!path.s[path.len-1]);
+    assert(path.len > 0);
+    assert(!path.s[path.len-1]);
+
+    filemap r = {0};
 
     FILE *f = fopen((char *)path.s, "rb");
     if (!f) {
-        MapFileResult r = {{0, 0}, MapFile_NOTFOUND};
+        r.status = filemap_NOTFOUND;
         return r;
     }
 
-    Arena tmp = *a;
-    Str buf = maxstr(&tmp);
-    Size len = (Size)fread(buf.s, 1, buf.len, f);
+    r.data.s = (u8 *)perm->beg;
+    size available = perm->end - perm->beg;
+    r.data.len = fread(r.data.s, 1, available, f);
     fclose(f);
 
-    if (len == buf.len) {
-        // Assume file is too large
-        MapFileResult readerr = {{0, 0}, MapFile_READERR};
-        return readerr;
+    if (r.data.len == available) {
+        // If it filled all available space, assume the file is too large
+        r.status = filemap_READERR;
+        return r;
     }
 
-    MapFileResult r = {newstr(a, len), MapFile_OK};
+    perm->beg += r.data.len;
+    r.status = filemap_OK;
     return r;
 }
 
-static void os_write(int fd, Str s)
+static void os_write(int fd, s8 s)
 {
-    ASSERT(fd==1 || fd==2);
+    assert(fd==1 || fd==2);
     FILE *f = fd==1 ? stdout : stderr;
     fwrite(s.s, s.len, 1, f);
     fflush(f);

@@ -4,16 +4,10 @@
 
 #define SYS_close 6
 #define SYS_exit  1
-#define SYS_fstat 108
 #define SYS_mmap  192  // actually mmap2
 #define SYS_open  5
+#define SYS_read  3
 #define SYS_write 4
-
-struct stat {
-    long pad1[5];
-    long st_size;
-    long pad2[16];
-};
 
 #include "linux_noarch.c"
 

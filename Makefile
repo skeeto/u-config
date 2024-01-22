@@ -3,12 +3,12 @@ CC    = gcc
 OPT   = -Os
 PC    = pkg-config  # e.g. for CROSS-pkg-config
 
-DEBUG_CFLAGS = -g3 -DDEBUG -Wall -Wextra -Wconversion -Wno-sign-conversion \
+DEBUG_CFLAGS = -g3 -Wall -Wextra -Wconversion -Wno-sign-conversion \
   -fsanitize=undefined -fsanitize-undefined-trap-on-error
 WIN32_CFLAGS = -fno-builtin -fno-asynchronous-unwind-tables
 WIN32_LIBS   = -s -nostdlib -Wl,--gc-sections -lkernel32
 LINUX_CFLAGS = -fno-builtin -fno-pie -fno-asynchronous-unwind-tables
-LINUX_LIBS   = -s -no-pie -nostdlib -Wl,--gc-sections
+LINUX_LIBS   = -static -s -no-pie -nostdlib -Wl,--gc-sections
 
 pkg-config.exe: win32_main.c cmdline.c miniwin32.h u-config.c
 	$(CROSS)$(CC) $(OPT) $(WIN32_CFLAGS) -o $@ win32_main.c $(WIN32_LIBS)
@@ -42,11 +42,10 @@ pkg-config-linux-i686-debug: linux_i686_main.c linux_noarch.c u-config.c
 
 # Concatenate Windows-only u-config into a single source file
 amalgamation: pkg-config.c
-pkg-config.c: u-config.c cmdline.c miniwin32.h win32_main.c
-	awk 'n{print"";n=0} NR==3{printf"%s\n%s\n",cc,cl} !/^#i.*"/{print}' \
+pkg-config.c: u-config.c miniwin32.h cmdline.c win32_main.c
+	awk 'n{print"";n=0} NR==3{printf"%s\n",cc} !/^#i.*"/{print}' \
 	    cc='//   $$ cc -nostartfiles -o pkg-config.exe pkg-config.c' \
-	    cl='//   $$ cl pkg-config.c' \
-	    >$@ u-config.c n=1 cmdline.c n=1 miniwin32.h n=1 win32_main.c
+	    >$@ u-config.c n=1 miniwin32.h n=1 cmdline.c n=1 win32_main.c
 
 release:
 	version=$$(git describe); prefix=u-config-$${version#v}; \

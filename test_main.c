@@ -2,10 +2,15 @@
 // On success prints "all tests pass" (for humans) and exits with a zero
 // status (for scripts). Attach a debugger to examine failures in detail.
 // This is free and unencumbered software released into the public domain.
-#ifndef DEBUG
-#  define DEBUG
+#ifndef __PTRDIFF_TYPE__  // not GCC-like?
+#  include <stddef.h>
+#  define __PTRDIFF_TYPE__         ptrdiff_t
+#  define __builtin_unreachable()  *(volatile int *)0 = 0
+#  define __builtin_trap()         *(volatile int *)0 = 0
+#  define __attribute(x)
 #endif
 #include "u-config.c"
+
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -13,73 +18,76 @@
 
 #define E S("")
 #define SHOULDPASS \
-    for (int r = setjmp(context.exit); !r || (r>0 && (TRAP, 0)); r = -1)
+    for (i32 r = setjmp(context.exit); !r || (r>0 && (trap(), 0)); r = -1)
 #define SHOULDFAIL \
-    for (int r = setjmp(context.exit); !r; TRAP)
+    for (i32 r = setjmp(context.exit); !r; trap())
 #define PCHDR "Name:\n" "Version:\n" "Description:\n"
 #define EXPECT(w) \
-    if (!equals(context.output, S(w))) { \
+    if (!s8equals(context.output, S(w))) { \
         printf("EXPECT: %s", w); \
         printf("OUTPUT: %.*s", (int)context.output.len, context.output.s); \
         fflush(stdout); \
-        TRAP; \
+        trap(); \
     }
 
 static struct {
     jmp_buf exit;
-    Arena arena;
-    Str outbuf;
-    Str output;
-    Str outavail;
-    Env filesystem;
-    Bool active;
+    arena   perm;
+    arena   reset;
+    s8      outbuf;
+    s8      output;
+    s8      outavail;
+    env    *filesystem;
+    b32     active;
 } context;
 
 static void os_fail(void)
 {
-    ASSERT(context.active);
+    assert(context.active);
     context.active = 0;
     longjmp(context.exit, 1);
 }
 
-static MapFileResult os_mapfile(Arena *a, Str path)
+static filemap os_mapfile(arena *perm, s8 path)
 {
-    (void)a;
-    ASSERT(path.s);
-    ASSERT(path.len);
-    ASSERT(!path.s[path.len-1]);
+    (void)perm;
+    assert(path.s);
+    assert(path.len);
+    assert(!path.s[path.len-1]);
     path.len--;  // trim null terminator
 
-    Str *contents = insert(0, &context.filesystem, path);
-    if (!contents) {
-        MapFileResult r = {{0, 0}, MapFile_NOTFOUND};
+    filemap r = {0};
+
+    s8 *data = insert(&context.filesystem, path, 0);
+    if (!data) {
+        r.status = filemap_NOTFOUND;
         return r;
     }
-    MapFileResult r = {*contents, MapFile_OK};
+    r.data = *data;
+    r.status = filemap_OK;
     return r;
 }
 
-static void os_write(int fd, Str s)
+static void os_write(i32 fd, s8 s)
 {
-    ASSERT(fd==1 || fd==2);
+    assert(fd==1 || fd==2);
     if (fd == 1) {
-        ASSERT(context.outavail.len >= s.len);
-        context.outavail = copy(context.outavail, s);
+        assert(context.outavail.len >= s.len);
+        context.outavail = s8copy(context.outavail, s);
         context.output.len += s.len;
     }
 }
 
-static Config newtest_(Str name)
+static config newtest_(s8 name)
 {
     printf("TEST: %.*s\n", (int)name.len, (char *)name.s);
 
-    Env empty = {0};
-    context.filesystem = empty;
-    context.arena.off = 0;
-    context.outbuf = newstr(&context.arena, 1<<10);
+    context.filesystem = 0;
+    context.perm = context.reset;
+    context.outbuf = news8(&context.perm, 1<<10);
 
-    Config conf = {0};
-    conf.arena = context.arena;
+    config conf = {0};
+    conf.perm = context.perm;
     conf.delim = ':';
     conf.sys_incpath = S("/usr/include");
     conf.sys_libpath = S("/lib:/usr/lib");
@@ -87,44 +95,44 @@ static Config newtest_(Str name)
     return conf;
 }
 
-static void newfile_(Config *conf, Str path, Str contents)
+static void newfile_(config *conf, s8 path, s8 contents)
 {
-    *insert(&conf->arena, &context.filesystem, path) = contents;
+    *insert(&context.filesystem, path, &conf->perm) = contents;
 }
 
-static void run(Config conf, ...)
+static void run(config conf, ...)
 {
     va_list ap;
 
     va_start(ap, conf);
     for (conf.nargs = 0;; conf.nargs++) {
-        Str arg = va_arg(ap, Str);
+        s8 arg = va_arg(ap, s8);
         if (!arg.len) {
             break;
         }
     }
     va_end(ap);
 
-    conf.args = (Str *)allocarray(&conf.arena, SIZEOF(Str), conf.nargs);
+    conf.args = new(&conf.perm, s8, conf.nargs);
     va_start(ap, conf);
-    for (Size i = 0; i < conf.nargs; i++) {
-        conf.args[i] = va_arg(ap, Str);
+    for (size i = 0; i < conf.nargs; i++) {
+        conf.args[i] = va_arg(ap, s8);
     }
     va_end(ap);
 
     context.output = takehead(context.outbuf, 0);
     context.outavail = context.outbuf;
-    shredfree(&conf.arena);
+    fillbytes(conf.perm.beg, 0x55, conf.perm.end-conf.perm.beg);
     context.active = 1;
-    appmain(conf);
-    ASSERT(context.active);
+    uconfig(&conf);
+    assert(context.active);
     context.active = 0;
 }
 
 static void test_noargs(void)
 {
     // NOTE: this is mainly a sanity check of the test system itself
-    Config conf = newtest_(S("no arguments"));
+    config conf = newtest_(S("no arguments"));
     SHOULDFAIL {
         run(conf, E);
     }
@@ -132,7 +140,7 @@ static void test_noargs(void)
 
 static void test_dashdash(void)
 {
-    Config conf = newtest_(S("handle -- argument"));
+    config conf = newtest_(S("handle -- argument"));
     newfile_(&conf, S("/usr/lib/pkgconfig/--foo.pc"), S(
         PCHDR
         "Cflags: -Dfoo\n"
@@ -149,7 +157,7 @@ static void test_dashdash(void)
 
 static void test_modversion(void)
 {
-    Config conf = newtest_(S("--modversion"));
+    config conf = newtest_(S("--modversion"));
     SHOULDPASS {
         newfile_(&conf, S("/usr/lib/pkgconfig/direct.pc"), S(
             "Name:\n"
@@ -179,7 +187,7 @@ static void test_modversion(void)
 
 static void test_versioncheck(void)
 {
-    Config conf = newtest_(S("version checks"));
+    config conf = newtest_(S("version checks"));
     newfile_(&conf, S("/usr/lib/pkgconfig/test.pc"), S(
         "Name:\n"
         "Version: 1.2.3\n"
@@ -222,7 +230,7 @@ static void test_versioncheck(void)
 
 static void test_overrides(void)
 {
-    Config conf = newtest_(S("--{atleast,exact,max}-version"));
+    config conf = newtest_(S("--{atleast,exact,max}-version"));
     newfile_(&conf, S("/usr/lib/pkgconfig/t.pc"), S(
         "Name:\n"
         "Version: 1\n"
@@ -262,7 +270,7 @@ static void test_overrides(void)
 
 static void test_maximum_traverse_depth(void)
 {
-    Config conf = newtest_(S("--maximum-traverse-depth"));
+    config conf = newtest_(S("--maximum-traverse-depth"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
         "Requires: b\n"
@@ -298,7 +306,7 @@ static void test_private_transitive(void)
 {
     // Scenario: a privately requires b which publicly requires c
     // Expect: --libs should not include c without --static
-    Config conf = newtest_(S("private transitive"));
+    config conf = newtest_(S("private transitive"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
         "Requires: x\n"
@@ -339,7 +347,7 @@ static void test_revealed_transitive(void)
     // The trouble is that x is initially loaded private. However, when
     // loading b it should become public, and so must be revisited in
     // traversal and marked as such.
-    Config conf = newtest_(S("revealed transitive"));
+    config conf = newtest_(S("revealed transitive"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
         "Requires.private: b\n"
@@ -367,7 +375,7 @@ static void test_revealed_transitive(void)
 
 static void test_syspaths(void)
 {
-    Config conf = newtest_(S("exclude syspaths"));
+    config conf = newtest_(S("exclude syspaths"));
     newfile_(&conf, S("/usr/lib/pkgconfig/example.pc"), S(
         PCHDR
         "prefix=/usr\n"
@@ -384,7 +392,7 @@ static void test_syspaths(void)
     }
     EXPECT("-DEXAMPLE -I/usr/include -lexample\n");
     SHOULDPASS {
-        Config copy = conf;
+        config copy = conf;
         copy.print_sysinc = S("");
         run(copy, S("--cflags"), S("--libs"), S("example"), E);
     }
@@ -395,7 +403,7 @@ static void test_syspaths(void)
     }
     EXPECT("-DEXAMPLE -L/usr/lib -lexample\n");
     SHOULDPASS {
-        Config copy = conf;
+        config copy = conf;
         copy.print_syslib = S("");
         run(copy, S("--cflags"), S("--libs"), S("example"), E);
     }
@@ -407,7 +415,7 @@ static void test_libsorder(void)
     // Scenario: two packages link a common library
     // Expect: the common library is listed after both, other flags
     //   maintain their first-seen position and de-duplicate the rest
-    Config conf = newtest_(S("library ordering"));
+    config conf = newtest_(S("library ordering"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
         "Cflags: -DA -DGL\n"
@@ -430,7 +438,7 @@ static void test_windows(void)
     // prefixes containing spaces are properly quoted. The fixed path
     // would be Win32 platform's fixed path if the binary was located in
     // "$HOME/bin".
-    Config conf = newtest_(S("windows"));
+    config conf = newtest_(S("windows"));
     conf.fixedpath = S(
         "C:/Documents and Settings/John Falstaff/lib/pkgconfig;"
         "C:/Documents and Settings/John Falstaff/share/pkgconfig"
@@ -490,58 +498,58 @@ static void test_windows(void)
     );
 }
 
-static void outlong_(Out *out, long x)
+static void printi32_(u8buf *out, i32 x)
 {
-    Byte buf[32];
-    Byte *e = buf + SIZEOF(buf);
-    Byte *p = e;
+    u8  buf[32];
+    u8 *e = buf + countof(buf);
+    u8 *p = e;
     do {
-        *--p = (Byte)(x%10 + '0');
+        *--p = (u8)(x%10) + '0';
     } while (x /= 10);
-    outstr(out, fromptrs(p, e));
+    prints8(out, s8span(p, e));
 }
 
 static void test_manyvars(void)
 {
-    // Stresses the treap-backed package environment
-    Config conf = newtest_(S("many variables"));
+    // Stresses the hash-trie-backed package environment
+    config conf = newtest_(S("many variables"));
     newfile_(&conf, S("manyvars.pc"), S(""));  // allocate empty file
-    long nvars = 10000;
+    i32 nvars = 10000;
 
-    for (long i = 0; i < nvars; i += 197) {
-        Config temp = conf;
-        Byte prefix = (Byte)('a' + i%26);
+    for (i32 i = 0; i < nvars; i += 197) {
+        config temp = conf;
+        u8 prefix = 'a' + (u8)(i%26);
 
         // Write a fresh .pc file into the virtual "manyvars.pc" with a
         // rotated variable order and prefix to perturb the package Env.
-        Out pc = newmembuf(&temp.arena);
-        outstr(&pc, S(PCHDR));
-        for (long v = 0; v < nvars; v++) {
-            long vnum = (v + i) % nvars;
-            outbyte(&pc, prefix);
-            outlong_(&pc, vnum);
-            outbyte(&pc, '=');
-            outbyte(&pc, 'A' + (Byte)(vnum%26));
-            outbyte(&pc, '\n');
+        u8buf pc = newmembuf(&temp.perm);
+        prints8(&pc, S(PCHDR));
+        for (i32 v = 0; v < nvars; v++) {
+            i32 vnum = (v + i) % nvars;
+            printu8(&pc, prefix);
+            printi32_(&pc, vnum);
+            printu8(&pc, '=');
+            printu8(&pc, 'A' + (u8)(vnum%26));
+            printu8(&pc, '\n');
         }
         newfile_(&temp, S("manyvars.pc"), finalize(&pc));  // overwrite
 
         // Probe a variable to test the environment
-        Out mem = newmembuf(&temp.arena);
-        outbyte(&mem, prefix);
-        outlong_(&mem, i);
-        Str var = finalize(&mem);
+        u8buf mem = newmembuf(&temp.perm);
+        printu8(&mem, prefix);
+        printi32_(&mem, i);
+        s8 var = finalize(&mem);
         SHOULDPASS {
             run(temp, S("manyvars.pc"), S("--variable"), var, E);
         }
-        Byte expect[] = {(Byte)('A' + i%26), '\n', 0};
+        u8 expect[] = {'A' + (u8)(i%26), '\n', 0};
         EXPECT(expect);
     }
 }
 
 static void test_lol(void)
 {
-    Config conf = newtest_(S("a billion laughs"));
+    config conf = newtest_(S("a billion laughs"));
     newfile_(&conf, S("lol.pc"), S(
         "v9=lol\n"
         "v8=${v9}${v9}${v9}${v9}${v9}${v9}${v9}${v9}${v9}${v9}\n"
@@ -562,17 +570,20 @@ static void test_lol(void)
     }
 }
 
-static Arena newarena_(Size cap)
+static arena newarena_(size cap)
 {
-    Arena arena = {0};
-    arena.mem.s = (Byte *)malloc(cap);
-    arena.mem.len = arena.mem.s ? cap : 0;
+    arena arena = {0};
+    arena.beg = malloc(cap);
+    if (!arena.beg) {
+        trap();
+    }
+    arena.end = arena.beg + cap;
     return arena;
 }
 
 int main(void)
 {
-    context.arena = newarena_(1<<21);
+    context.perm = context.reset = newarena_(1<<21);
 
     test_noargs();
     test_dashdash();
@@ -588,7 +599,6 @@ int main(void)
     test_manyvars();
     test_lol();
 
-    free(context.arena.mem.s);  // to satisfy leak checkers
     puts("all tests pass");
     return 0;
 }
