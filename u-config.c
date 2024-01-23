@@ -863,7 +863,9 @@ static void usage(Out *out)
     "  PKG_CONFIG_LIBDIR\n"
     "  PKG_CONFIG_TOP_BUILD_DIR\n"
     "  PKG_CONFIG_SYSTEM_INCLUDE_PATH\n"
-    "  PKG_CONFIG_SYSTEM_LIBRARY_PATH\n";
+    "  PKG_CONFIG_SYSTEM_LIBRARY_PATH\n"
+    "  PKG_CONFIG_ALLOW_SYSTEM_CFLAGS\n"
+    "  PKG_CONFIG_ALLOW_SYSTEM_LIBS\n";
     outstr(out, S(usage));
 }
 
