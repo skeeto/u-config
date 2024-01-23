@@ -100,7 +100,7 @@ static Str fromenv_(Arena *a, const wchar_t *name)
     // case does not clear the last error. Therefore we must clear the
     // error before GetEnvironmentVariable in order to tell them apart.
     SetLastError(0);
-    DWORD wlen = GetEnvironmentVariableW(name, w, sizeof(w));
+    DWORD wlen = GetEnvironmentVariableW(name, w, COUNTOF(w));
     if (!wlen && ERROR_ENVVAR_NOT_FOUND==GetLastError()) {
         Str r = {0};
         return r;
