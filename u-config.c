@@ -15,7 +15,6 @@ typedef          char    byte;
 #define new(a, t, n)  (t *)alloc(a, sizeof(t), n)
 #define s8(s)         {(u8 *)s, countof(s)-1}
 #define S(s)          (s8)s8(s)
-#define trap()        __builtin_trap()
 
 typedef struct {
     u8  *s;

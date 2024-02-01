@@ -18,16 +18,18 @@
 
 #define E S("")
 #define SHOULDPASS \
-    for (i32 r = setjmp(context.exit); !r || (r>0 && (trap(), 0)); r = -1)
+    for (i32 r = setjmp(context.exit); \
+         !r || (r>0 && (__builtin_trap(), 0)); \
+         r = -1)
 #define SHOULDFAIL \
-    for (i32 r = setjmp(context.exit); !r; trap())
+    for (i32 r = setjmp(context.exit); !r; __builtin_trap())
 #define PCHDR "Name:\n" "Version:\n" "Description:\n"
 #define EXPECT(w) \
     if (!s8equals(context.output, S(w))) { \
         printf("EXPECT: %s", w); \
         printf("OUTPUT: %.*s", (int)context.output.len, context.output.s); \
         fflush(stdout); \
-        trap(); \
+        __builtin_trap(); \
     }
 
 static struct {
@@ -584,7 +586,7 @@ static arena newarena_(size cap)
     arena arena = {0};
     arena.beg = malloc(cap);
     if (!arena.beg) {
-        trap();
+        __builtin_trap();
     }
     arena.end = arena.beg + cap;
     return arena;

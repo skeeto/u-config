@@ -13,7 +13,6 @@
 #  define __SIZE_TYPE__          unsigned __int32
 #endif
 #define __builtin_unreachable()  __assume(0)
-#define __builtin_trap()         __debugbreak()
 #define __attribute(x)
 
 #include "win32_main.c"
