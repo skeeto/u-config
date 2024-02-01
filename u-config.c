@@ -191,9 +191,8 @@ static s8 cuttail(s8 s, size len)
 {
     assert(len >= 0);
     assert(len <= s.len);
-    s8 r = s;
     s.len -= len;
-    return r;
+    return s;
 }
 
 static s8 taketail(s8 s, size len)
