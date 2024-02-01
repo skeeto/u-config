@@ -158,30 +158,39 @@ static void test_dashdash(void)
 static void test_modversion(void)
 {
     config conf = newtest_(S("--modversion"));
+    newfile_(&conf, S("/usr/lib/pkgconfig/direct.pc"), S(
+        "Name:\n"
+        "Version: 1.2.3\n"
+        "Description:\n"
+        "Requires: req"
+    ));
+    newfile_(&conf, S("/usr/share/pkgconfig/indirect.pc"), S(
+        "major = 12\n"
+        "minor = 345\n"
+        "patch = 6789\n"
+        "version = ${major}.${minor}.${patch}\n"
+        "Name:\n"
+        "Version: ${version}\n"
+        "Description:\n"
+    ));
+    newfile_(&conf, S("/usr/share/pkgconfig/req.pc"), S(
+        "version = 420.69.1337\n"
+        "Name:\n"
+        "Version: ${version}\n"
+        "Description:\n"
+    ));
     SHOULDPASS {
-        newfile_(&conf, S("/usr/lib/pkgconfig/direct.pc"), S(
-            "Name:\n"
-            "Version: 1.2.3\n"
-            "Description:\n"
-            "Requires: req"
-        ));
-        newfile_(&conf, S("/usr/share/pkgconfig/indirect.pc"), S(
-            "major = 12\n"
-            "minor = 345\n"
-            "patch = 6789\n"
-            "version = ${major}.${minor}.${patch}\n"
-            "Name:\n"
-            "Version: ${version}\n"
-            "Description:\n"
-        ));
-        newfile_(&conf, S("/usr/share/pkgconfig/req.pc"), S(
-            "version = 420.69.1337\n"
-            "Name:\n"
-            "Version: ${version}\n"
-            "Description:\n"
-        ));
         run(conf, S("--modversion"), S("direct"), S("indirect"), E);
         EXPECT("1.2.3\n12.345.6789\n");
+    }
+    SHOULDPASS {
+        // One package is listed twice, first by its name and discovered
+        // by searching the path, and second by directly by its path. It
+        // must be recognized internally as the same package and so only
+        // print one version.
+        run(conf, S("--modversion"), S("direct"),
+                S("/usr/lib/pkgconfig/direct.pc"), E);
+        EXPECT("1.2.3\n");
     }
 }
 
