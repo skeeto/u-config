@@ -229,7 +229,7 @@ static s8 fromenv_(arena *perm, c16 *name)
     }
     s16 wvar = {0};
     wvar.s   = (c16 *)perm->beg;
-    wvar.len = wlen-1;
+    wvar.len = wlen - 1;
     GetEnvironmentVariableW(name, wvar.s, wlen);
 
     byte *save = perm->beg;
@@ -426,7 +426,7 @@ static void flushconsole_(u16buf *b)
     b->len = 0;
 }
 
-static void printrune_(u16buf *b, c32 rune)
+static void printc32_(u16buf *b, c32 rune)
 {
     if (b->len > countof(b->buf)-2) {
         flushconsole_(b);
@@ -466,7 +466,7 @@ static void os_write(i32 fd, s8 s)
         state.tail = s;
         while (state.tail.len) {
             state = utf8decode_(state.tail);
-            printrune_(&b, state.rune);
+            printc32_(&b, state.rune);
         }
         flushconsole_(&b);
         *err = b.err;

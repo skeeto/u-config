@@ -456,18 +456,6 @@ struct pkg {
     s8 cflags;
 };
 
-static pkg *findpkg(pkg **p, s8 realname, arena *perm)
-{
-    for (u32 h = s8hash(realname); *p; h <<= 2) {
-        if (s8equals((*p)->realname, realname)) {
-            return *p;
-        }
-        p = &(*p)->child[h>>30];
-    }
-    *p = new(perm, pkg, 1);
-    return *p;
-}
-
 static s8 *fieldbyid(pkg *p, i32 id)
 {
     assert(id >= 0);
@@ -515,14 +503,20 @@ static pkgs *newpkgs(arena *perm)
 // space in the set for a new package.
 static pkg *locate(pkgs *t, s8 realname, arena *perm)
 {
-    pkg *p = findpkg(&t->pkgs, realname, perm);
-    if (!p->realname.s) {
-        t->count++;
-        p->realname = realname;
-        *t->tail = p;
-        t->tail = &p->list;
+    pkg **p = &t->pkgs;
+    for (u32 h = s8hash(realname); *p; h <<= 2) {
+        if (s8equals((*p)->realname, realname)) {
+            return *p;
+        }
+        p = &(*p)->child[h>>30];
     }
-    return p;
+
+    *p = new(perm, pkg, 1);
+    (*p)->realname = realname;
+    t->count++;
+    *t->tail = *p;
+    t->tail = &(*p)->list;
+    return *p;
 }
 
 enum { parse_OK, parse_DUPFIELD, parse_DUPVARABLE };
