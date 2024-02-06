@@ -29,6 +29,10 @@ long syscall1(long, long);
 long syscall2(long, long, long);
 long syscall3(long, long, long, long);
 long syscall6(long, long, long, long, long, long, long);
+#define syscall1(sys_num, a0)         syscall1(a0,         sys_num)
+#define syscall2(sys_num, a0, a1)     syscall2(a0, a1,     sys_num)
+#define syscall3(sys_num, a0, a1, a2) syscall3(a0, a1, a2, sys_num)
+#define syscall6(sys_num, a0, a1, a2, a3, a4, a5) syscall6(a0, a1, a2, a3, a4, a5, sys_num)
 
 static void os_fail(void)
 {
