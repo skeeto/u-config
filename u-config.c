@@ -84,7 +84,7 @@ static b32 digit(u8 c)
 static b32 whitespace(u8 c)
 {
     switch (c) {
-    case '\t': case '\n': case '\b': case '\f': case '\r': case ' ':
+    case '\t': case '\n': case '\r': case ' ':
         return 1;
     }
     return 0;
@@ -277,47 +277,49 @@ static cut s8cut(s8 s, u8 delim)
     return r;
 }
 
-// Encode whitespace with illegal UTF-8 bytes. Reversible. Prevents
-// splitting on spaces when processing paths. Encode paths before
-// variable assignment, which is reversed by dequote() when printed.
-static u8 wsencode(u8 c)
+// Encode paths with illegal UTF-8 bytes. Reversible. Allows white space
+// and meta characters in paths to behave differently. Encode paths
+// before variable assignment. Reversed by dequote() when printed.
+static u8 pathencode(u8 c)
 {
-    // NOTE: classification must agree with whitespace()
+    // NOTE: space classification must agree with whitespace()
     switch (c) {
-        case '\b': return 0xf8;
-        case '\t': return 0xf9;
-        case '\n': return 0xfa;
-        case '\f': return 0xfb;
-        case '\r': return 0xfc;
-        case ' ' : return 0xfd;
+        case '\t': return 0xf8;
+        case '\n': return 0xf9;
+        case '\r': return 0xfa;
+        case ' ' : return 0xfb;
+        case '$' : return 0xfc;
+        case '(' : return 0xfd;
+        case ')' : return 0xfe;
     }
     return c;
 }
 
-static u8 wsdecode(u8 c)
+static u8 pathdecode(u8 c)
 {
     switch (c) {
-        case 0xf8: return '\b';
-        case 0xf9: return '\t';
-        case 0xfa: return '\n';
-        case 0xfb: return '\f';
-        case 0xfc: return '\r';
-        case 0xfd: return ' ' ;
+        case 0xf8: return '\t';
+        case 0xf9: return '\n';
+        case 0xfa: return '\r';
+        case 0xfb: return ' ' ;
+        case 0xfc: return '$' ;
+        case 0xfd: return '(' ;
+        case 0xfe: return ')' ;
     }
     return c;
 }
 
-static s8 s8wsencode(s8 s, arena *perm)
+static s8 s8pathencode(s8 s, arena *perm)
 {
     b32 encode = 0;
     for (size i = 0; i<s.len && !encode; i++) {
-        encode = wsencode(s.s[i]) != s.s[i];
+        encode = pathencode(s.s[i]) != s.s[i];
     }
     if (!encode) return s;  // no encoding necessary
 
     s8 r = news8(perm, s.len);
     for (size i = 0; i < s.len; i++) {
-        r.s[i] = wsencode(s.s[i]);
+        r.s[i] = pathencode(s.s[i]);
     }
     return r;
 }
@@ -1067,7 +1069,7 @@ static pkg findpackage(search *dirs, u8buf *err, s8 realname, arena *perm)
     }
     r.pkg.path = path;
     r.pkg.realname = realname;
-    s8 pcfiledir = s8wsencode(dirname(path), perm);
+    s8 pcfiledir = s8pathencode(dirname(path), perm);
     *insert(&r.pkg.env, S("pcfiledir"), perm) = pcfiledir;
 
     s8 missing = {0};
@@ -1101,12 +1103,13 @@ typedef struct {
     b32 ok;
 } dequoted;
 
+// Matches pkg-config's listing, which excludes "$()", but also match
+// pathencode()ed bytes for escaping, which handles "$()" in paths.
 static b32 shellmeta(u8 c)
 {
-    // NOTE: matches pkg-config's listing, which excludes "$()"
     s8 meta = S("\"!#%&'*<>?[\\]`{|}");
     for (size i = 0; i < meta.len; i++) {
-        if (meta.s[i] == c) {
+        if (meta.s[i]==c || pathdecode(c)!=c) {
             return 1;
         }
     }
@@ -1130,21 +1133,19 @@ static dequoted dequote(s8 s, arena *perm)
         if (whitespace(c)) {
             c = ' ';
         }
-        u8 decoded = wsdecode(c);
+        u8 decoded = pathdecode(c);
 
         if (quote == '\'') {
-            c = decoded;
             if (c == '\'') {
                 quote = 0;
             } else if (c==' ' || shellmeta(c)) {
                 printu8(&mem, '\\');
-                printu8(&mem, c);
+                printu8(&mem, decoded);
             } else {
-                printu8(&mem, c);
+                printu8(&mem, decoded);
             }
 
         } else if (quote == '"') {
-            c = decoded;
             if (escaped) {
                 escaped = 0;
                 if (c!='\\' && c!='"') {
@@ -1153,25 +1154,21 @@ static dequoted dequote(s8 s, arena *perm)
                         printu8(&mem, '\\');
                     }
                 }
-                printu8(&mem, c);
+                printu8(&mem, decoded);
             } else if (c == '\"') {
                 quote = 0;
             } else if (c==' ' || shellmeta(c)) {
                 printu8(&mem, '\\');
-                printu8(&mem, c);
+                printu8(&mem, decoded);
             } else {
                 escaped = c == '\\';
-                printu8(&mem, c);
+                printu8(&mem, decoded);
             }
 
         } else if (c=='\'' || c=='"') {
             quote = c;
 
         } else if (shellmeta(c)) {
-            printu8(&mem, '\\');
-            printu8(&mem, c);
-
-        } else if (c != decoded) {
             printu8(&mem, '\\');
             printu8(&mem, decoded);
 
@@ -1348,7 +1345,7 @@ static void setprefix(pkg *p, arena *perm)
     s8 parent = dirname(p->path);
     if (s8equals(S("pkgconfig"), basename(parent))) {
         s8 prefix = dirname(dirname(parent));
-        prefix = s8wsencode(prefix, perm);
+        prefix = s8pathencode(prefix, perm);
         *insert(&p->env, S("prefix"), perm) = prefix;
     }
 }
@@ -1652,7 +1649,7 @@ static void insertsyspath(fieldwriter *w, s8 path, u8 delim, u8 flag)
         }
 
         // Prepend option flag
-        dir = s8wsencode(dir, perm);
+        dir = s8pathencode(dir, perm);
         s8 syspath = news8(perm, prefix.len+dir.len);
         s8copy(s8copy(syspath, prefix), dir);
 
@@ -1757,15 +1754,17 @@ static void uconfig(config *conf)
     s8 variable = {0};
 
     proc->define_prefix = conf->define_prefix;
-    if (!conf->top_builddir.s) {
-        conf->top_builddir = S("$(top_builddir)");
+    s8 top_builddir = conf->top_builddir;
+    if (top_builddir.s) {
+        top_builddir = s8pathencode(top_builddir, perm);
+    } else {
+        top_builddir = S("$(top_builddir)");
     }
 
     *insert(&global, S("pc_path"), perm) = conf->fixedpath;
     *insert(&global, S("pc_system_includedirs"), perm) = conf->sys_incpath;
     *insert(&global, S("pc_system_libdirs"), perm) = conf->sys_libpath;
     *insert(&global, S("pc_sysrootdir"), perm) = S("/");
-    s8 top_builddir = s8wsencode(conf->top_builddir, perm);
     *insert(&global, S("pc_top_builddir"), perm) = top_builddir;
 
     s8 *args = new(perm, s8, conf->nargs);

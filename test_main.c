@@ -509,6 +509,43 @@ static void test_windows(void)
     );
 }
 
+static void test_parens(void)
+{
+    // Test if that paths allow parenthesis, but also that parenthesis
+    // otherwise still work as meta characters.
+    config conf = newtest_(S("parens"));
+    conf.fixedpath = S(
+        "C:/Program Files (x86)/Contoso/lib/pkgconfig"
+    );
+    conf.define_prefix = 1;
+    conf.delim = ';';
+    newfile_(&conf, S(
+        "C:/Program Files (x86)/Contoso/lib/pkgconfig/example.pc"
+    ), S(
+        PCHDR
+        "prefix=/usr/local\n"
+        "Cflags: -I${pc_top_builddir}/include -I${prefix}/include\n"
+        "Libs: -L\"${pc_top_builddir}/lib\"\n"
+    ));
+
+    SHOULDPASS {
+        run(conf, S("--cflags"), S("--libs"), S("example"), E);
+    }
+    EXPECT(
+        "-I$(top_builddir)/include "
+        "-IC:/Program\\ Files\\ \\(x86\\)/Contoso/include "
+        "-L$(top_builddir)/lib\n"
+    );
+
+    conf.top_builddir = S("U:/falstaffj$/Henry IV (Part 1)");
+    SHOULDPASS {
+        run(conf, S("--libs"), S("example"), E);
+    }
+    EXPECT(
+        "-LU:/falstaffj\\$/Henry\\ IV\\ \\(Part\\ 1\\)/lib\n"
+    );
+}
+
 static void printi32_(u8buf *out, i32 x)
 {
     u8  buf[32];
@@ -607,6 +644,7 @@ int main(void)
     test_syspaths();
     test_libsorder();
     test_windows();
+    test_parens();
     test_manyvars();
     test_lol();
 
