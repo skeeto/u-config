@@ -476,7 +476,7 @@ static void test_windows(void)
         "libdir=${prefix}/lib\n"
         "includedir=${prefix}/include\n"
         "Libs: -L${libdir} -lexample\n"
-        "Cflags: -I${includedir}\n"
+        "Cflags: -I\"${includedir}\"\n"
     ));
     newfile_(&conf, S(
         "C:/Program Files/SDL2/x86_64-w64-mingw32/lib/pkgconfig/sdl2.pc"

@@ -277,6 +277,51 @@ static cut s8cut(s8 s, u8 delim)
     return r;
 }
 
+// Encode whitespace with illegal UTF-8 bytes. Reversible. Prevents
+// splitting on spaces when processing paths. Encode paths before
+// variable assignment, which is reversed by dequote() when printed.
+static u8 wsencode(u8 c)
+{
+    // NOTE: classification must agree with whitespace()
+    switch (c) {
+        case '\b': return 0xf8;
+        case '\t': return 0xf9;
+        case '\n': return 0xfa;
+        case '\f': return 0xfb;
+        case '\r': return 0xfc;
+        case ' ' : return 0xfd;
+    }
+    return c;
+}
+
+static u8 wsdecode(u8 c)
+{
+    switch (c) {
+        case 0xf8: return '\b';
+        case 0xf9: return '\t';
+        case 0xfa: return '\n';
+        case 0xfb: return '\f';
+        case 0xfc: return '\r';
+        case 0xfd: return ' ' ;
+    }
+    return c;
+}
+
+static s8 s8wsencode(s8 s, arena *perm)
+{
+    b32 encode = 0;
+    for (size i = 0; i<s.len && !encode; i++) {
+        encode = wsencode(s.s[i]) != s.s[i];
+    }
+    if (!encode) return s;  // no encoding necessary
+
+    s8 r = news8(perm, s.len);
+    for (size i = 0; i < s.len; i++) {
+        r.s[i] = wsencode(s.s[i]);
+    }
+    return r;
+}
+
 typedef struct {
     u8    *buf;
     size   cap;
@@ -1022,7 +1067,8 @@ static pkg findpackage(search *dirs, u8buf *err, s8 realname, arena *perm)
     }
     r.pkg.path = path;
     r.pkg.realname = realname;
-    *insert(&r.pkg.env, S("pcfiledir"), perm) = dirname(path);
+    s8 pcfiledir = s8wsencode(dirname(path), perm);
+    *insert(&r.pkg.env, S("pcfiledir"), perm) = pcfiledir;
 
     s8 missing = {0};
     if (!r.pkg.name.s) {
@@ -1084,8 +1130,10 @@ static dequoted dequote(s8 s, arena *perm)
         if (whitespace(c)) {
             c = ' ';
         }
+        u8 decoded = wsdecode(c);
 
         if (quote == '\'') {
+            c = decoded;
             if (c == '\'') {
                 quote = 0;
             } else if (c==' ' || shellmeta(c)) {
@@ -1096,6 +1144,7 @@ static dequoted dequote(s8 s, arena *perm)
             }
 
         } else if (quote == '"') {
+            c = decoded;
             if (escaped) {
                 escaped = 0;
                 if (c!='\\' && c!='"') {
@@ -1121,6 +1170,10 @@ static dequoted dequote(s8 s, arena *perm)
         } else if (shellmeta(c)) {
             printu8(&mem, '\\');
             printu8(&mem, c);
+
+        } else if (c != decoded) {
+            printu8(&mem, '\\');
+            printu8(&mem, decoded);
 
         } else if (c==' ') {
             break;
@@ -1290,27 +1343,12 @@ static void procfail(u8buf *err, versop op, pkg *p)
     os_fail();
 }
 
-// Wrap the string in quotes if it contains whitespace.
-static s8 maybequote(s8 s, arena *perm)
-{
-    for (size i = 0; i < s.len; i++) {
-        if (whitespace(s.s[i])) {
-            s8 r = news8(perm, s.len+2);
-            s8 t = s8copy(r, S("\""));
-               t = s8copy(t, s);
-                   s8copy(t, S("\""));
-            return r;
-        }
-    }
-    return s;
-}
-
 static void setprefix(pkg *p, arena *perm)
 {
     s8 parent = dirname(p->path);
     if (s8equals(S("pkgconfig"), basename(parent))) {
         s8 prefix = dirname(dirname(parent));
-        prefix = maybequote(prefix, perm);
+        prefix = s8wsencode(prefix, perm);
         *insert(&p->env, S("prefix"), perm) = prefix;
     }
 }
@@ -1614,11 +1652,11 @@ static void insertsyspath(fieldwriter *w, s8 path, u8 delim, u8 flag)
         }
 
         // Prepend option flag
+        dir = s8wsencode(dir, perm);
         s8 syspath = news8(perm, prefix.len+dir.len);
         s8copy(s8copy(syspath, prefix), dir);
 
         // Process as an argument, as though being printed
-        syspath = maybequote(syspath, perm);
         dequoted dr = dequote(syspath, perm);
         syspath = dr.arg;
 
@@ -1727,7 +1765,8 @@ static void uconfig(config *conf)
     *insert(&global, S("pc_system_includedirs"), perm) = conf->sys_incpath;
     *insert(&global, S("pc_system_libdirs"), perm) = conf->sys_libpath;
     *insert(&global, S("pc_sysrootdir"), perm) = S("/");
-    *insert(&global, S("pc_top_builddir"), perm) = conf->top_builddir;
+    s8 top_builddir = s8wsencode(conf->top_builddir, perm);
+    *insert(&global, S("pc_top_builddir"), perm) = top_builddir;
 
     s8 *args = new(perm, s8, conf->nargs);
     size nargs = 0;
