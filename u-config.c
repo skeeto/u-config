@@ -121,7 +121,7 @@ static b32 pathsep(u8 c)
     return c=='/' || c=='\\';
 }
 
-__attribute((malloc, alloc_size(2, 3)))
+__attribute((malloc, alloc_size(3, 2)))
 static byte *alloc(arena *a, size objsize, size count)
 {
     assert(objsize > 0);
