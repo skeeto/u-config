@@ -2,6 +2,7 @@
 // This is free and unencumbered software released into the public domain.
 
 typedef __SIZE_TYPE__  uptr;
+typedef unsigned short u16;
 typedef unsigned short char16_t;
 typedef char16_t       c16;
 
@@ -25,16 +26,16 @@ enum {
     STD_ERROR_HANDLE  = -12,
 };
 
-#define W32(r) __declspec(dllimport) r __stdcall
-W32(b32)    CloseHandle(uptr);
-W32(i32)    CreateFileW(c16 *, i32, i32, uptr, i32, i32, i32);
-W32(void)   ExitProcess(i32);
-W32(c16 *)  GetCommandLineW(void);
-W32(b32)    GetConsoleMode(uptr, i32 *);
-W32(i32)    GetEnvironmentVariableW(c16 *, c16 *, i32);
-W32(i32)    GetModuleFileNameW(uptr, c16 *, i32);
-W32(i32)    GetStdHandle(i32);
-W32(b32)    ReadFile(uptr, u8 *, i32, i32 *, uptr);
-W32(byte *) VirtualAlloc(uptr, size, i32, i32);
-W32(b32)    WriteConsoleW(uptr, c16 *, i32, i32 *, uptr);
-W32(b32)    WriteFile(uptr, u8 *, i32, i32 *, uptr);
+b32   (__stdcall *CloseHandle)(uptr);
+i32   (__stdcall *CreateFileW)(c16 *, i32, i32, uptr, i32, i32, i32);
+void  (__stdcall *ExitProcess)(i32);
+c16  *(__stdcall *GetCommandLineW)(void);
+b32   (__stdcall *GetConsoleMode)(uptr, i32 *);
+i32   (__stdcall *GetEnvironmentVariableW)(c16 *, c16 *, i32);
+i32   (__stdcall *GetModuleFileNameW)(uptr, c16 *, i32);
+void *(__stdcall *GetProcAddress)(u8 *, u8 *);
+i32   (__stdcall *GetStdHandle)(i32);
+b32   (__stdcall *ReadFile)(uptr, u8 *, i32, i32 *, uptr);
+byte *(__stdcall *VirtualAlloc)(uptr, size, i32, i32);
+b32   (__stdcall *WriteConsoleW)(uptr, c16 *, i32, i32 *, uptr);
+b32   (__stdcall *WriteFile)(uptr, u8 *, i32, i32 *, uptr);

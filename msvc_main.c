@@ -3,7 +3,6 @@
 // This is free and unencumbered software released into the public domain.
 #pragma comment(linker, "/subsystem:console")
 #pragma comment(lib, "libvcruntime.lib")
-#pragma comment(lib, "kernel32.lib")
 
 #ifdef _WIN64
 #  define __PTRDIFF_TYPE__       __int64

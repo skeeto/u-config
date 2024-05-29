@@ -74,7 +74,7 @@ probably interacting with tools that do not. It outputs arguments encoded
 in UTF-8 regardless of the system code page. Do not link a C runtime (CRT)
 in this configuration.
 
-    $ cc -Os -nostartfiles -o pkg-config win32_main.c
+    $ cc -Os -fno-builtin -nostdlib -o pkg-config win32_main.c
 
 Or with MSVC:
 

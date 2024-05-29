@@ -1,5 +1,5 @@
 // Mingw-w64 Win32 platform layer for u-config
-// $ cc -nostartfiles -o pkg-config win32_main.c
+// $ cc -nostdlib -o pkg-config win32_main.c
 // This is free and unencumbered software released into the public domain.
 #include "u-config.c"
 #include "miniwin32.h"
@@ -314,9 +314,44 @@ static config *newconfig_()
     return conf;
 }
 
-__attribute((force_align_arg_pointer))
-void mainCRTStartup(void)
+static void win32_init(void *peb)
 {
+    u8  ******p   = peb;  // !!!
+    u8  *kernel32 = p[3][1+8/sizeof(uptr)][0][0][6];
+    u32 *pe       = (u32 *)(kernel32 + *(u32 *)(kernel32 + 0x3c));
+    u32 *edata    = (u32 *)(kernel32 + pe[26+sizeof(uptr)]);
+    u32 *addrs    = (u32 *)(kernel32 + edata[7]);
+    u32 *names    = (u32 *)(kernel32 + edata[8]);
+    u16 *ordinals = (u16 *)(kernel32 + edata[9]);
+
+    for (i32 i = 0;; i++) {
+        s8 name = fromcstr_(kernel32 + names[i]);
+        if (s8equals(name, S("GetProcAddress"))) {
+            GetProcAddress = (void *)(kernel32 + addrs[ordinals[i]]);
+            break;
+        }
+    }
+    #define LINK(lib, f) f = GetProcAddress(lib, (u8 *)#f)
+    LINK(kernel32, CloseHandle);
+    LINK(kernel32, CreateFileW);
+    LINK(kernel32, ExitProcess);
+    LINK(kernel32, GetCommandLineW);
+    LINK(kernel32, GetConsoleMode);
+    LINK(kernel32, GetEnvironmentVariableW);
+    LINK(kernel32, GetModuleFileNameW);
+    LINK(kernel32, GetStdHandle);
+    LINK(kernel32, ReadFile);
+    LINK(kernel32, VirtualAlloc);
+    LINK(kernel32, WriteConsoleW);
+    LINK(kernel32, WriteFile);
+    #undef LINK
+}
+
+__attribute((force_align_arg_pointer))
+void mainCRTStartup(void *peb)
+{
+    win32_init(peb);
+
     config *conf = newconfig_();
     conf->delim = ';';
     conf->define_prefix = 1;
