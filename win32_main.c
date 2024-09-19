@@ -306,7 +306,7 @@ static s8 fromcstr_(u8 *z)
     return s;
 }
 
-static config *newconfig_()
+static config *newconfig_(void)
 {
     arena perm = newarena_(1<<22);
     config *conf = new(&perm, config, 1);
