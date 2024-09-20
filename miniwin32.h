@@ -1,9 +1,10 @@
 // Win32 types, constants, and declarations (replaces windows.h)
 // This is free and unencumbered software released into the public domain.
 
-typedef __SIZE_TYPE__  uptr;
-typedef unsigned short char16_t;
-typedef char16_t       c16;
+typedef __PTRDIFF_TYPE__ iptr;
+typedef __SIZE_TYPE__    uptr;
+typedef unsigned short   char16_t;
+typedef char16_t         c16;
 
 enum {
     FILE_ATTRIBUTE_NORMAL = 0x80,
@@ -26,15 +27,15 @@ enum {
 };
 
 #define W32(r) __declspec(dllimport) r __stdcall
-W32(b32)    CloseHandle(uptr);
+W32(b32)    CloseHandle(iptr);
 W32(i32)    CreateFileW(c16 *, i32, i32, uptr, i32, i32, i32);
 W32(void)   ExitProcess(i32);
 W32(c16 *)  GetCommandLineW(void);
-W32(b32)    GetConsoleMode(uptr, i32 *);
+W32(b32)    GetConsoleMode(iptr, i32 *);
 W32(i32)    GetEnvironmentVariableW(c16 *, c16 *, i32);
-W32(i32)    GetModuleFileNameW(uptr, c16 *, i32);
+W32(i32)    GetModuleFileNameW(iptr, c16 *, i32);
 W32(i32)    GetStdHandle(i32);
-W32(b32)    ReadFile(uptr, u8 *, i32, i32 *, uptr);
+W32(b32)    ReadFile(iptr, u8 *, i32, i32 *, uptr);
 W32(byte *) VirtualAlloc(uptr, size, i32, i32);
-W32(b32)    WriteConsoleW(uptr, c16 *, i32, i32 *, uptr);
-W32(b32)    WriteFile(uptr, u8 *, i32, i32 *, uptr);
+W32(b32)    WriteConsoleW(iptr, c16 *, i32, i32 *, uptr);
+W32(b32)    WriteFile(iptr, u8 *, i32, i32 *, uptr);
