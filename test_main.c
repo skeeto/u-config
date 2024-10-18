@@ -470,6 +470,31 @@ static void test_libsorder(void)
     EXPECT("-DA -DGL -DB -L/opt/lib -pthread -mwindows -la -lb -lopengl32\n");
 }
 
+static void test_staticorder(void)
+{
+    // Scenario: liba depends on libc and libb, libb depends on libc
+    // Expect: libc is listed last
+    config conf = newtest_(S("static library ordering"));
+    newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
+        PCHDR
+        "Requires.private: c b\n"
+        "Libs: -la\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/b.pc"), S(
+        PCHDR
+        "Requires.private: c\n"
+        "Libs: -lb\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/c.pc"), S(
+        PCHDR
+        "Libs: -lc\n"
+    ));
+    SHOULDPASS {
+        run(conf, S("--static"), S("--libs"), S("a"), E);
+    }
+    EXPECT("-la -lb -lc\n");
+}
+
 static void test_windows(void)
 {
     // Tests the ';' delimiter, that the prefix is overridden, and that
@@ -671,6 +696,7 @@ int main(void)
     test_revealed_transitive();
     test_syspaths();
     test_libsorder();
+    test_staticorder();
     test_windows();
     test_parens();
     test_manyvars();
