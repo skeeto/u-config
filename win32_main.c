@@ -240,6 +240,17 @@ static s8 fromenv_(arena *perm, c16 *name)
     return var;
 }
 
+// Normalize path to slashes as separators.
+static s8 normalize_(s8 path)
+{
+    for (size i = 0; i < path.len; i++) {
+        if (path.s[i] == '\\') {
+            path.s[i] = '/';
+        }
+    }
+    return path;
+}
+
 static i32 truncsize(size len)
 {
     i32 max = 0x7fffffff;
@@ -264,14 +275,7 @@ static s8 installdir_(arena *perm)
     exe.len   = GetModuleFileNameW(0, exe.s, cap);
     perm->beg = (byte *)(exe.s + exe.len);
 
-    // Normalize by converting backslashes to slashes
-    for (size i = 0; i < exe.len; i++) {
-        if (exe.s[i] == '\\') {
-            exe.s[i] = '/';
-        }
-    }
-
-    s8 path = fromwide_(perm, exe);
+    s8 path = normalize_(fromwide_(perm, exe));
     perm->beg = save;  // free the wide path
     return dirname(dirname(path));
 }
@@ -349,6 +353,11 @@ void mainCRTStartup(void)
     conf->sys_libpath  = append2_(perm, base, S(PKG_CONFIG_PREFIX "/lib"));
     conf->print_sysinc = fromenv_(perm, L"PKG_CONFIG_ALLOW_SYSTEM_CFLAGS");
     conf->print_syslib = fromenv_(perm, L"PKG_CONFIG_ALLOW_SYSTEM_LIBS");
+
+    // Reduce backslash occurrences in outputs
+    normalize_(conf->envpath);
+    normalize_(conf->fixedpath);
+    normalize_(conf->top_builddir);
 
     uconfig(conf);
     ExitProcess(handles[1].err || handles[2].err);
