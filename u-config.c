@@ -506,7 +506,7 @@ static s8 *fieldbyid(pkg *p, i32 id)
 {
     assert(id >= 0);
     assert(id < PKG_NFIELDS);
-    return &p->name + id;
+    return (s8 *)((byte *)&p->name + id*sizeof(s8));
 }
 
 static s8 *fieldbyname(pkg *p, s8 name)
