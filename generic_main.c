@@ -97,6 +97,8 @@ int main(int argc, char **argv)
     }
 
     conf->pc_path = S(pkg_config_path);
+    conf->pc_sysincpath = S(PKG_CONFIG_SYSTEM_INCLUDE_PATH);
+    conf->pc_syslibpath = S(PKG_CONFIG_SYSTEM_LIBRARY_PATH);
     conf->envpath = fromcstr_(getenv("PKG_CONFIG_PATH"));
     conf->fixedpath = fromcstr_(getenv("PKG_CONFIG_LIBDIR"));
     if (!conf->fixedpath.s) {

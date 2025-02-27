@@ -130,6 +130,8 @@ static i32 os_main(i32 argc, u8 **argv, u8 **envp)
     }
 
     conf->pc_path = S(PKG_CONFIG_LIBDIR);
+    conf->pc_sysincpath = S(PKG_CONFIG_SYSTEM_INCLUDE_PATH);
+    conf->pc_syslibpath = S(PKG_CONFIG_SYSTEM_LIBRARY_PATH);
     conf->fixedpath = S(PKG_CONFIG_LIBDIR);
     conf->sys_incpath = S(PKG_CONFIG_SYSTEM_INCLUDE_PATH);
     conf->sys_libpath = S(PKG_CONFIG_SYSTEM_LIBRARY_PATH);

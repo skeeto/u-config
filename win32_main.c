@@ -344,14 +344,16 @@ void mainCRTStartup(void)
     s8 lib   = S(PKG_CONFIG_PREFIX "/lib/pkgconfig");
     s8 share = S(PKG_CONFIG_PREFIX "/share/pkgconfig");
     conf->pc_path = makepath_(perm, base, lib, share);
+    conf->pc_sysincpath = append2_(perm, base, S(PKG_CONFIG_PREFIX "/include"));
+    conf->pc_syslibpath = append2_(perm, base, S(PKG_CONFIG_PREFIX "/lib"));
     conf->envpath = fromenv_(perm, L"PKG_CONFIG_PATH");
     conf->fixedpath = fromenv_(perm, L"PKG_CONFIG_LIBDIR");
     if (!conf->fixedpath.s) {
         conf->fixedpath = conf->pc_path;
     }
     conf->top_builddir = fromenv_(perm, L"PKG_CONFIG_TOP_BUILD_DIR");
-    conf->sys_incpath  = append2_(perm, base, S(PKG_CONFIG_PREFIX "/include"));
-    conf->sys_libpath  = append2_(perm, base, S(PKG_CONFIG_PREFIX "/lib"));
+    conf->sys_incpath  = conf->pc_sysincpath;
+    conf->sys_libpath  = conf->pc_syslibpath;
     conf->print_sysinc = fromenv_(perm, L"PKG_CONFIG_ALLOW_SYSTEM_CFLAGS");
     conf->print_syslib = fromenv_(perm, L"PKG_CONFIG_ALLOW_SYSTEM_LIBS");
 

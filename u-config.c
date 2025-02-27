@@ -31,6 +31,8 @@ typedef struct {
     s8   *args;
     size  nargs;
     s8    pc_path;       // default compile time fixedpath
+    s8    pc_sysincpath; // default compile time system include path
+    s8    pc_syslibpath; // default compile time system library path
     s8    envpath;       // $PKG_CONFIG_PATH or empty
     s8    fixedpath;     // $PKG_CONFIG_LIBDIR or default
     s8    top_builddir;  // $PKG_CONFIG_TOP_BUILD_DIR or default
@@ -1762,8 +1764,8 @@ static void uconfig(config *conf)
     }
 
     *insert(&global, S("pc_path"), perm) = conf->pc_path;
-    *insert(&global, S("pc_system_includedirs"), perm) = conf->sys_incpath;
-    *insert(&global, S("pc_system_libdirs"), perm) = conf->sys_libpath;
+    *insert(&global, S("pc_system_includedirs"), perm) = conf->pc_sysincpath;
+    *insert(&global, S("pc_system_libdirs"), perm) = conf->pc_syslibpath;
     *insert(&global, S("pc_sysrootdir"), perm) = S("/");
     *insert(&global, S("pc_top_builddir"), perm) = top_builddir;
 
