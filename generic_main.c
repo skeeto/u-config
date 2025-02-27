@@ -96,6 +96,7 @@ int main(int argc, char **argv)
         conf->args[i] = fromcstr_(argv[i]);
     }
 
+    conf->pc_path = S(pkg_config_path);
     conf->envpath = fromcstr_(getenv("PKG_CONFIG_PATH"));
     conf->fixedpath = fromcstr_(getenv("PKG_CONFIG_LIBDIR"));
     if (!conf->fixedpath.s) {

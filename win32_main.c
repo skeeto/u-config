@@ -340,13 +340,14 @@ void mainCRTStartup(void)
         conf->args[i] = fromcstr_(argv[i+1]);
     }
 
-    s8 base = installdir_(perm);
+    s8 base  = installdir_(perm);
+    s8 lib   = S(PKG_CONFIG_PREFIX "/lib/pkgconfig");
+    s8 share = S(PKG_CONFIG_PREFIX "/share/pkgconfig");
+    conf->pc_path = makepath_(perm, base, lib, share);
     conf->envpath = fromenv_(perm, L"PKG_CONFIG_PATH");
     conf->fixedpath = fromenv_(perm, L"PKG_CONFIG_LIBDIR");
     if (!conf->fixedpath.s) {
-        s8 lib   = S(PKG_CONFIG_PREFIX "/lib/pkgconfig");
-        s8 share = S(PKG_CONFIG_PREFIX "/share/pkgconfig");
-        conf->fixedpath = makepath_(perm, base, lib, share);
+        conf->fixedpath = conf->pc_path;
     }
     conf->top_builddir = fromenv_(perm, L"PKG_CONFIG_TOP_BUILD_DIR");
     conf->sys_incpath  = append2_(perm, base, S(PKG_CONFIG_PREFIX "/include"));

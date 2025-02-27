@@ -30,6 +30,7 @@ typedef struct {
     arena perm;
     s8   *args;
     size  nargs;
+    s8    pc_path;       // default compile time fixedpath
     s8    envpath;       // $PKG_CONFIG_PATH or empty
     s8    fixedpath;     // $PKG_CONFIG_LIBDIR or default
     s8    top_builddir;  // $PKG_CONFIG_TOP_BUILD_DIR or default
@@ -1760,7 +1761,7 @@ static void uconfig(config *conf)
         top_builddir = S("$(top_builddir)");
     }
 
-    *insert(&global, S("pc_path"), perm) = conf->fixedpath;
+    *insert(&global, S("pc_path"), perm) = conf->pc_path;
     *insert(&global, S("pc_system_includedirs"), perm) = conf->sys_incpath;
     *insert(&global, S("pc_system_libdirs"), perm) = conf->sys_libpath;
     *insert(&global, S("pc_sysrootdir"), perm) = S("/");
