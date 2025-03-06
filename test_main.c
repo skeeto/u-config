@@ -239,6 +239,33 @@ static void test_versioncheck(void)
     }
 }
 
+static void test_versionorder(void)
+{
+    // Scenario: liba depends on libc and libb
+    // Expect: modversion order is unaffected
+    config conf = newtest_(S("library version ordering"));
+    newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
+        "Name: \n"
+        "Description: \n"
+        "Version: 1\n"
+        "Requires: c b\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/b.pc"), S(
+        "Name: \n"
+        "Description: \n"
+        "Version: 2\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/c.pc"), S(
+        "Name: \n"
+        "Description: \n"
+        "Version: 3\n"
+    ));
+    SHOULDPASS {
+        run(conf, S("--modversion"), S("a"), S("b"), S("c"), E);
+    }
+    EXPECT("1\n2\n3\n");
+}
+
 static void test_overrides(void)
 {
     config conf = newtest_(S("--{atleast,exact,max}-version"));
@@ -637,6 +664,7 @@ int main(void)
     test_dashdash();
     test_modversion();
     test_versioncheck();
+    test_versionorder();
     test_overrides();
     test_maximum_traverse_depth();
     test_private_transitive();

@@ -1794,6 +1794,7 @@ static void uconfig(config *conf)
 
         } else if (s8equals(r.arg, S("-modversion"))) {
             modversion = 1;
+            proc->recursive = 0;
 
         } else if (s8equals(r.arg, S("-define-prefix"))) {
             proc->define_prefix = 1;
