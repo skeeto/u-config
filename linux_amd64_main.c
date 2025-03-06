@@ -2,12 +2,17 @@
 // This is free and unencumbered software released into the public domain.
 #include "u-config.c"
 
-#define SYS_close 3
-#define SYS_exit  60
-#define SYS_mmap  9
-#define SYS_open  2
-#define SYS_read  0
-#define SYS_write 1
+enum {
+    SYS_close   = 3,
+    SYS_exit    = 60,
+    SYS_mmap    = 9,
+    SYS_open    = 2,
+    SYS_read    = 0,
+    SYS_write   = 1,
+
+    MAP_PRIVATE     = 0x02,
+    MAP_ANONYMOUS   = 0x20,
+};
 
 #include "linux_noarch.c"
 
