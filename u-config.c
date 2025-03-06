@@ -480,12 +480,13 @@ static s8 buildpath(s8 dir, s8 pc, arena *perm)
     return path;
 }
 
-enum { pkg_DIRECT=1<<0, pkg_PUBLIC=1<<1 };
+enum { pkg_DIRECT=1<<0, pkg_PUBLIC=1<<1, pkg_NEW=1<<2 };
 
 typedef struct pkg pkg;
 struct pkg {
     pkg *child[4];
-    pkg *list;  // total load order list
+    pkg *next;  // total load order list
+    pkg *prev;
     s8   path;
     s8   realname;
     s8   contents;
@@ -537,15 +538,13 @@ static s8 *fieldbyname(pkg *p, s8 name)
 typedef struct {
     pkg  *pkgs;
     pkg  *head;
-    pkg **tail;
+    pkg  *tail;
     size  count;
 } pkgs;
 
 static pkgs *newpkgs(arena *perm)
 {
-    pkgs *p = new(perm, pkgs, 1);
-    p->tail = &p->head;
-    return p;
+    return new(perm, pkgs, 1);
 }
 
 // Locate a previously-loaded package, or allocate zero-initialized
@@ -563,9 +562,29 @@ static pkg *locate(pkgs *t, s8 realname, arena *perm)
     *p = new(perm, pkg, 1);
     (*p)->realname = realname;
     t->count++;
-    *t->tail = *p;
-    t->tail = &(*p)->list;
     return *p;
+}
+
+static void prepend(pkgs *t, pkg *p)
+{
+    assert(!p->next && !p->prev);
+    pkg *h = t->head;
+    if (!h) {
+        t->head = t->tail = p;
+    } else {
+        t->head = p;
+        h->prev = p;
+        p->next = h;
+    }
+}
+
+static b32 allpresent(pkgs *t)
+{
+    size count = 0;
+    for (pkg *p = t->head; p; p = p->next) {
+        count++;
+    }
+    return count == t->count;
 }
 
 enum { parse_OK, parse_DUPFIELD, parse_DUPVARABLE };
@@ -1396,6 +1415,10 @@ static void process(processor *proc, s8 arg, arena *perm)
 
     while (top >= 0) {
         procstate *s = stack + top;
+        if (s->flags & pkg_NEW) {
+            prepend(pkgs, s->last);
+            s->flags &= ~pkg_NEW;
+        }
         s8pair pair = nexttoken(s->arg);
         s8 tok = pair.head;
         if (!tok.len) {
@@ -1455,6 +1478,7 @@ static void process(processor *proc, s8 arg, arena *perm)
             }
         } else {
             // Package hasn't been loaded yet, so find and load it.
+            s->flags |= pkg_NEW;
             pkg newpkg = findpackage(search, err, tok, perm);
             if (proc->define_prefix) {
                 setprefix(&newpkg, perm);
@@ -1480,6 +1504,7 @@ static void process(processor *proc, s8 arg, arena *perm)
         }
         p->flags |= flags;
     }
+    assert(allpresent(pkgs));
 
     proc->last = stack[0].last;
     proc->op = stack[0].op;
@@ -1969,7 +1994,7 @@ static void uconfig(config *conf)
 
     // --{atleast,exact,max}-version
     if (override_op) {
-        for (pkg *p = pkgs->head; p; p = p->list) {
+        for (pkg *p = pkgs->tail; p; p = p->prev) {
             i32 cmp = compareversions(p->version, override_version);
             if (!validcompare(override_op, cmp)) {
                 failversion(err, p, override_op, override_version);
@@ -1978,7 +2003,7 @@ static void uconfig(config *conf)
     }
 
     if (modversion) {
-        for (pkg *p = pkgs->head; p; p = p->list) {
+        for (pkg *p = pkgs->tail; p; p = p->prev) {
             if (p->flags & pkg_DIRECT) {
                 prints8(out, p->version);
                 prints8(out, S("\n"));
@@ -1987,7 +2012,7 @@ static void uconfig(config *conf)
     }
 
     if (variable.s) {
-        for (pkg *p = pkgs->head; p; p = p->list) {
+        for (pkg *p = pkgs->tail; p; p = p->prev) {
             if (p->flags & pkg_DIRECT) {
                 s8 value = lookup(global, p->env, variable);
                 if (value.s) {
@@ -2006,7 +2031,7 @@ static void uconfig(config *conf)
         if (!print_sysinc) {
             insertsyspath(&fw, conf->sys_incpath, conf->delim, 'I');
         }
-        for (pkg *p = pkgs->head; p; p = p->list) {
+        for (pkg *p = pkgs->head; p; p = p->next) {
             appendfield(err, &fw, p, p->cflags);
         }
         writeargs(out, &fw);
@@ -2020,7 +2045,7 @@ static void uconfig(config *conf)
         if (!print_syslib) {
             insertsyspath(&fw, conf->sys_libpath, conf->delim, 'L');
         }
-        for (pkg *p = pkgs->head; p; p = p->list) {
+        for (pkg *p = pkgs->head; p; p = p->next) {
             if (static_) {
                 appendfield(err, &fw, p, p->libs);
                 appendfield(err, &fw, p, p->libsprivate);
