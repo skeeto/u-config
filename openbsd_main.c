@@ -41,8 +41,7 @@ static long syscall6(long n, long a, long b, long c, long d, long e, long f)
     register long r8  asm("r8")  = e;
     register long r9  asm("r9")  = f;
     asm volatile (
-        ".equ _syscall6, .\n"
-        "syscall"
+        "_syscall6: syscall\n"
         : "+a"(n), "+d"(c), "=@ccc"(err)
         : "D"(a), "S"(b), "r"(r10), "r"(r8), "r"(r9)
         : "rcx", "r11", "memory"
