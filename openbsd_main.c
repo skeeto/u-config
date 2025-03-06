@@ -1,6 +1,5 @@
 // libc-free platform layer for amd64 OpenBSD
-// $ sh path/to/w64devkit/libmemory.c
-// $ cc -static -nostdlib -no-pie -o pkg-config openbsd_main.c libmemory.a
+// $ cc -static -nostartfiles -no-pie -o pkg-config openbsd_main.c
 // This is free and unencumbered software released into the public domain.
 #include "u-config.c"
 
@@ -50,8 +49,8 @@ static long syscall6(long n, long a, long b, long c, long d, long e, long f)
 }
 
 asm (
-    "        .globl _start\n"
-    "_start: mov   %rsp, %rdi\n"
+    "        .globl __start\n"
+    "__start:mov   %rsp, %rdi\n"
     "        call  entrypoint\n"
 
     ".pushsection .note.openbsd.ident, \"a\"\n"
