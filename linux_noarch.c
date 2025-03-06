@@ -95,7 +95,8 @@ static arena newarena_(void)
 {
     arena a = {0};
     size cap = 1<<22;
-    unsigned long p = syscall6(SYS_mmap, 0, cap, 3, 0x22, -1, 0);
+    int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+    unsigned long p = syscall6(SYS_mmap, 0, cap, 3, flags, -1, 0);
     if (p > -4096UL) {
         a.beg = (byte *)16;  // aligned, non-null, zero-size arena
         cap = 0;
