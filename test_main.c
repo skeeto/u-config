@@ -374,7 +374,7 @@ static void test_private_transitive(void)
     SHOULDPASS {
         run(conf, S("--libs"), S("--static"), S("a"), E);
     }
-    EXPECT("-la -lb -lc -lx\n");
+    EXPECT("-la -lx -lb -lc\n");
 }
 
 static void test_revealed_transitive(void)
