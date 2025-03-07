@@ -557,11 +557,6 @@ typedef struct {
     size  count;
 } pkgs;
 
-static pkgs *newpkgs(arena *perm)
-{
-    return new(perm, pkgs, 1);
-}
-
 // Locate a previously-loaded package, or allocate zero-initialized
 // space in the set for a new package.
 static pkg *locate(pkgs *t, s8 realname, arena *perm)
@@ -587,13 +582,13 @@ static void prepend(pkgs *t, pkg *p)
     t->head = p;
 }
 
-static b32 allpresent(pkgs *t)
+static b32 allpresent(pkgs t)
 {
     size count = 0;
-    for (pkg *p = t->head; p; p = p->list) {
+    for (pkg *p = t.head; p; p = p->list) {
         count++;
     }
-    return count == t->count;
+    return count == t.count;
 }
 
 enum { parse_OK, parse_DUPFIELD, parse_DUPVARABLE };
@@ -1377,7 +1372,6 @@ typedef struct {
     u8buf    *err;
     search    search;
     env     **global;
-    pkgs     *pkgs;
     i32       maxdepth;
     b32       define_prefix;
     b32       recursive;
@@ -1385,7 +1379,7 @@ typedef struct {
     procstate stack[256];
 } processor;
 
-static processor *newprocessor(config *c, u8buf *err, env **g, pkgs *pkgs)
+static processor *newprocessor(config *c, u8buf *err, env **g)
 {
     arena *perm = &c->perm;
     processor *proc = new(perm, processor, 1);
@@ -1394,7 +1388,6 @@ static processor *newprocessor(config *c, u8buf *err, env **g, pkgs *pkgs)
     appendpath(&proc->search, c->envpath, perm);
     appendpath(&proc->search, c->fixedpath, perm);
     proc->global = g;
-    proc->pkgs = pkgs;
     proc->maxdepth = (u32)-1 >> 1;
     proc->define_prefix = 1;
     proc->recursive = 1;
@@ -1452,10 +1445,10 @@ static void failversion(u8buf *err, pkg *pkg, versop op, s8 want)
     os_fail();
 }
 
-static void process(processor *proc, s8 arg, arena *perm)
+static pkgs process(processor *proc, s8 arg, arena *perm)
 {
     u8buf *err = proc->err;
-    pkgs *pkgs = proc->pkgs;
+    pkgs pkgs = {0};
     env **global = proc->global;
     search *search = &proc->search;
 
@@ -1469,7 +1462,7 @@ static void process(processor *proc, s8 arg, arena *perm)
     while (top >= 0) {
         procstate *s = stack + top;
         if (s->flags & pkg_NEW) {
-            prepend(pkgs, s->last);
+            prepend(&pkgs, s->last);
             s->flags &= ~pkg_NEW;
         }
         s8pair pair = nexttoken(s->arg);
@@ -1510,7 +1503,7 @@ static void process(processor *proc, s8 arg, arena *perm)
 
         i32 depth = s->depth + 1;
         i32 flags = s->flags;
-        pkg *p = s->last = locate(pkgs, pathtorealname(tok), perm);
+        pkg *p = s->last = locate(&pkgs, pathtorealname(tok), perm);
         if (p->contents.s) {
             if (flags&pkg_PUBLIC && !(p->flags & pkg_PUBLIC)) {
                 // We're on a public branch, but this package was
@@ -1558,6 +1551,7 @@ static void process(processor *proc, s8 arg, arena *perm)
         p->flags |= flags;
     }
     assert(allpresent(pkgs));
+    return pkgs;
 }
 
 typedef enum {
@@ -1803,10 +1797,9 @@ static void uconfig(config *conf)
     env *global = 0;
     filter filterc = filter_ANY;
     filter filterl = filter_ANY;
-    pkgs *pkgs = newpkgs(perm);
     u8buf *out = newfdbuf(perm, 1, 1<<12);
     u8buf *err = newfdbuf(perm, 2, 1<<7);
-    processor *proc = newprocessor(conf, err, &global, pkgs);
+    processor *proc = newprocessor(conf, err, &global);
     size argcount = 0;
 
     b32 msvc = 0;
@@ -2024,9 +2017,9 @@ static void uconfig(config *conf)
     }
 
     s8 fullargs = joinargs(perm, args, nargs);
-    process(proc, fullargs, perm);
+    pkgs pkgs = process(proc, fullargs, perm);
 
-    if (!pkgs->count) {
+    if (!pkgs.count) {
         prints8(err, S("pkg-config: "));
         prints8(err, S("requires at least one package name\n"));
         flush(err);
@@ -2035,7 +2028,7 @@ static void uconfig(config *conf)
 
     // --{atleast,exact,max}-version
     if (override_op) {
-        for (pkg *p = pkgs->head; p; p = p->list) {
+        for (pkg *p = pkgs.head; p; p = p->list) {
             i32 cmp = compareversions(p->version, override_version);
             if (!validcompare(override_op, cmp)) {
                 failversion(err, p, override_op, override_version);
@@ -2044,7 +2037,7 @@ static void uconfig(config *conf)
     }
 
     if (modversion) {
-        for (pkg *p = pkgs->head; p; p = p->list) {
+        for (pkg *p = pkgs.head; p; p = p->list) {
             if (p->flags & pkg_DIRECT) {
                 prints8(out, p->version);
                 prints8(out, S("\n"));
@@ -2053,7 +2046,7 @@ static void uconfig(config *conf)
     }
 
     if (variable.s) {
-        for (pkg *p = pkgs->head; p; p = p->list) {
+        for (pkg *p = pkgs.head; p; p = p->list) {
             if (p->flags & pkg_DIRECT) {
                 s8 value = lookup(global, p->env, variable);
                 if (value.s) {
@@ -2072,7 +2065,7 @@ static void uconfig(config *conf)
         if (!print_sysinc) {
             insertsyspath(&fw, conf->sys_incpath, conf->delim, 'I');
         }
-        for (pkg *p = pkgs->head; p; p = p->list) {
+        for (pkg *p = pkgs.head; p; p = p->list) {
             appendfield(err, &fw, p, p->cflags);
         }
         writeargs(out, &fw);
@@ -2086,7 +2079,7 @@ static void uconfig(config *conf)
         if (!print_syslib) {
             insertsyspath(&fw, conf->sys_libpath, conf->delim, 'L');
         }
-        for (pkg *p = pkgs->head; p; p = p->list) {
+        for (pkg *p = pkgs.head; p; p = p->list) {
             if (static_) {
                 appendfield(err, &fw, p, p->libs);
                 appendfield(err, &fw, p, p->libsprivate);
