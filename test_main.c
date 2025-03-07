@@ -452,7 +452,7 @@ static void test_libsorder(void)
 {
     // Scenario: two packages link a common library
     // Expect: the common library is listed after both, other flags
-    //   are de-duplicated
+    //   maintain their first-seen position and de-duplicate the rest
     config conf = newtest_(S("library ordering"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
