@@ -1542,16 +1542,16 @@ static void process(processor *proc, s8 arg, arena *perm)
                     failmaxrecurse(err, tok);
                 }
                 top++;
-                stack[top].arg = p->requiresprivate;
-                stack[top].last = 0;
-                stack[top].depth = depth;
-                stack[top].flags = 0;
-                stack[top].op = versop_ERR;
-                top++;
                 stack[top].arg = p->requires;
                 stack[top].last = 0;
                 stack[top].depth = depth;
                 stack[top].flags = flags & ~pkg_DIRECT;
+                stack[top].op = versop_ERR;
+                top++;
+                stack[top].arg = p->requiresprivate;
+                stack[top].last = 0;
+                stack[top].depth = depth;
+                stack[top].flags = 0;
                 stack[top].op = versop_ERR;
             }
         }
