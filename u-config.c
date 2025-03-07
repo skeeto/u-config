@@ -236,37 +236,20 @@ static b32 tokenspace(u8 c)
     return whitespace(c) || c==',';
 }
 
-static s8 skiptokenspaceleft(s8 s)
+static s8 skiptokenspace(s8 s)
 {
     for (; s.len && tokenspace(*s.s); s = cuthead(s, 1)) {}
     return s;
 }
 
-static s8 skiptokenspaceright(s8 s)
-{
-    for (; s.len && tokenspace(s.s[s.len-1]); s = cuttail(s, 1)) {}
-    return s;
-}
-
 static s8pair nexttoken(s8 s)
 {
-    s = skiptokenspaceleft(s);
+    s = skiptokenspace(s);
     size len = 0;
     for (; len<s.len && !tokenspace(s.s[len]); len++) {}
     s8pair r = {0};
     r.head = takehead(s, len);
     r.tail = cuthead(s, len);
-    return r;
-}
-
-static s8pair lasttoken(s8 s)
-{
-    s = skiptokenspaceright(s);
-    size len = 0;
-    for (; len<s.len && !tokenspace(s.s[s.len-len-1]); len++) {}
-    s8pair r = {0};
-    r.head = takehead(s, s.len-len);
-    r.tail = cuthead(s, s.len-len);
     return r;
 }
 
@@ -497,17 +480,78 @@ static s8 buildpath(s8 dir, s8 pc, arena *perm)
     return path;
 }
 
-enum { pkg_DIRECT=1<<0, pkg_PUBLIC=1<<1, pkg_NEW=1<<2 };
+typedef enum {
+    versop_ERR=0,
+    versop_LT,
+    versop_LTE,
+    versop_EQ,
+    versop_GTE,
+    versop_GT
+} versop;
+
+static versop parseop(s8 s)
+{
+    if (s8equals(S("<"), s)) {
+        return versop_LT;
+    } else if (s8equals(S("<="), s)) {
+        return versop_LTE;
+    } else if (s8equals(S("="), s)) {
+        return versop_EQ;
+    } else if (s8equals(S(">="), s)) {
+        return versop_GTE;
+    } else if (s8equals(S(">"), s)) {
+        return versop_GT;
+    }
+    return versop_ERR;
+}
+
+static s8 opname(versop op)
+{
+    switch (op) {
+    case versop_ERR: break;
+    case versop_LT:  return S("<");
+    case versop_LTE: return S("<=");
+    case versop_EQ:  return S("=");
+    case versop_GTE: return S(">=");
+    case versop_GT:  return S(">");
+    }
+    assert(0);
+}
+
+static b32 validcompare(versop op, i32 result)
+{
+    switch (op) {
+    case versop_ERR: break;
+    case versop_LT:  return result <  0;
+    case versop_LTE: return result <= 0;
+    case versop_EQ:  return result == 0;
+    case versop_GTE: return result >= 0;
+    case versop_GT:  return result >  0;
+    }
+    assert(0);
+}
+
+typedef struct pkgspec pkgspec;
+struct pkgspec {
+    pkgspec *next;
+    s8       name;
+    versop   op;
+    s8       version;
+};
+
+enum { pkg_DIRECT=1<<0, pkg_PUBLIC=1<<1 };
 
 typedef struct pkg pkg;
 struct pkg {
-    pkg *child[4];
-    pkg *list;  // total load order list
-    s8   path;
-    s8   realname;
-    s8   contents;
-    env *env;
-    i32  flags;
+    pkg     *child[4];
+    pkg     *list;  // total load order list
+    s8       path;
+    s8       realname;
+    s8       contents;
+    env     *env;
+    pkgspec *specs_requires;
+    pkgspec *specs_requiresprivate;
+    i32      flags;
 
     #define PKG_NFIELDS 10
     s8 name;
@@ -632,6 +676,85 @@ static s8 stripescapes(arena *perm, s8 s)
         }
     }
     return takehead(c, len);
+}
+
+static pkgspec *newpkgspec(arena *a, s8 name, pkgspec *next)
+{
+    pkgspec *r = new(a, pkgspec, 1);
+    r->next = next;
+    r->name = name;
+    return r;
+}
+
+static void checknotop(u8buf *err, s8 tok, pkg *p)
+{
+    if (parseop(tok)) {
+        prints8(err, S("pkg-config: "));
+        prints8(err, S("unexpected operator '"));
+        prints8(err, tok);
+        prints8(err, S("'"));
+        if (p) {
+            prints8(err, S(" in package '"));
+            prints8(err, p->realname);
+            prints8(err, S("'"));
+        }
+        prints8(err, S("\n"));
+        flush(err);
+        os_fail();
+    }
+}
+
+static void opfail(u8buf *err, versop op, pkg *p)
+{
+    prints8(err, S("pkg-config: "));
+    prints8(err, S("expected version following operator "));
+    prints8(err, opname(op));
+    if (p) {
+        prints8(err, S(" in package '"));
+        prints8(err, p->realname);
+        prints8(err, S("'"));
+    }
+    prints8(err, S("\n"));
+    flush(err);
+    os_fail();
+}
+
+static pkgspec *parsespecs(s8 *args, size nargs, pkg *p, u8buf *err, arena *a)
+{
+    pkgspec *head = 0;
+    pkgspec *pkg  = 0;
+
+    for (size i = 0; i < nargs; i++) {
+        s8pair sp = {0};
+        sp.tail = args[i];
+        for (;;) {
+            sp = nexttoken(sp.tail);
+            s8 tok = sp.head;
+            if (!tok.len) {
+                break;
+            }
+
+            if (!pkg) {
+                checknotop(err, tok, p);
+                head = pkg = newpkgspec(a, tok, head);
+
+            } else if (!pkg->op) {
+                pkg->op = parseop(tok);
+                if (!pkg->op) {
+                    head = pkg = newpkgspec(a, tok, head);
+                }
+
+            } else {
+                pkg->version = tok;
+                pkg = 0;
+            }
+        }
+    }
+
+    if (pkg && pkg->op && !pkg->version.s) {
+        opfail(err, pkg->op, p);
+    }
+    return head;
 }
 
 static parseresult parsepackage(s8 src, arena *perm)
@@ -1035,6 +1158,13 @@ static void expandmerge(u8buf *err, env *g, pkg *base, pkg *update, arena *perm)
         expand(&mem, err, g, update, src);
         *fieldbyid(base, i) = finalize(&mem);
     }
+
+    base->specs_requires = parsespecs(
+        &base->requires, 1, base, err, perm
+    );
+    base->specs_requiresprivate = parsespecs(
+        &base->requiresprivate, 1, base, err, perm
+    );
 }
 
 static pkg findpackage(search *dirs, u8buf *err, s8 realname, arena *perm)
@@ -1261,111 +1391,11 @@ static i32 compareversions(s8 va, s8 vb)
     return 0;
 }
 
-typedef enum {
-    versop_ERR=0,
-    versop_LT,
-    versop_LTE,
-    versop_EQ,
-    versop_GTE,
-    versop_GT
-} versop;
-
-static versop parseop(s8 s)
-{
-    if (s8equals(S("<"), s)) {
-        return versop_LT;
-    } else if (s8equals(S("<="), s)) {
-        return versop_LTE;
-    } else if (s8equals(S("="), s)) {
-        return versop_EQ;
-    } else if (s8equals(S(">="), s)) {
-        return versop_GTE;
-    } else if (s8equals(S(">"), s)) {
-        return versop_GT;
-    }
-    return versop_ERR;
-}
-
-static s8 opname(versop op)
-{
-    switch (op) {
-    case versop_ERR: break;
-    case versop_LT:  return S("<");
-    case versop_LTE: return S("<=");
-    case versop_EQ:  return S("=");
-    case versop_GTE: return S(">=");
-    case versop_GT:  return S(">");
-    }
-    assert(0);
-}
-
-static b32 validcompare(versop op, i32 result)
-{
-    switch (op) {
-    case versop_ERR: break;
-    case versop_LT:  return result <  0;
-    case versop_LTE: return result <= 0;
-    case versop_EQ:  return result == 0;
-    case versop_GTE: return result >= 0;
-    case versop_GT:  return result >  0;
-    }
-    assert(0);
-}
-
-// Command line arguments are processed as one long string joined with
-// whitespace, just like dependency listings inside a .pc file. To
-// simplify processing, literally concatenate them in reverse order while
-// maintaining the operator tuples.
-static s8 joinargs(arena *a, s8 *args, size nargs)
-{
-    u8buf b = newmembuf(a);
-
-    s8   null = {0};
-    s8   hold = {0};
-    versop op = 0;
-
-    for (size i = nargs-1; i >= 0; i--) {
-        for (s8pair p = lasttoken(args[i]); p.tail.len; p = lasttoken(p.head)) {
-            s8 tok = p.tail;
-
-            if (op) {
-                prints8(&b, S(" "));
-                prints8(&b, tok);
-                prints8(&b, S(" "));
-                prints8(&b, opname(op));
-                prints8(&b, S(" "));
-                prints8(&b, hold);
-                hold = null;
-                op = 0;
-
-            } else if (!(op = parseop(tok))) {
-                if (hold.s) {
-                    prints8(&b, S(" "));
-                    prints8(&b, hold);
-                }
-                hold = tok;
-            }
-        }
-    }
-
-    if (op) {
-        prints8(&b, S(" "));
-        prints8(&b, opname(op));
-    }
-    if (hold.s) {
-        prints8(&b, S(" "));
-        prints8(&b, hold);
-    }
-
-    return finalize(&b);
-}
-
 typedef struct {
-    s8     arg;
-    pkg   *last;
-    i32    depth;
-    i32    flags;
-    versop op;
+    pkgspec *specs;
+    pkg     *newpkg;
+    i32      depth;
+    i32      flags;
 } procstate;
 
 typedef struct {
@@ -1392,21 +1422,6 @@ static processor *newprocessor(config *c, u8buf *err, env **g)
     proc->define_prefix = 1;
     proc->recursive = 1;
     return proc;
-}
-
-static void procfail(u8buf *err, versop op, pkg *p)
-{
-    prints8(err, S("pkg-config: "));
-    prints8(err, S("expected version following operator "));
-    prints8(err, opname(op));
-    if (p) {
-        prints8(err, S(" in package '"));
-        prints8(err, p->realname);
-        prints8(err, S("'"));
-    }
-    prints8(err, S("\n"));
-    flush(err);
-    os_fail();
 }
 
 static void setprefix(pkg *p, arena *perm)
@@ -1445,7 +1460,7 @@ static void failversion(u8buf *err, pkg *pkg, versop op, s8 want)
     os_fail();
 }
 
-static pkgs process(processor *proc, s8 arg, arena *perm)
+static pkgs process(processor *proc, pkgspec *specs, arena *perm)
 {
     u8buf *err = proc->err;
     pkgs pkgs = {0};
@@ -1456,54 +1471,28 @@ static pkgs process(processor *proc, s8 arg, arena *perm)
     i32 cap = countof(proc->stack);
     i32 top = 0;
     stack[0] = (procstate){0};
-    stack[0].arg = arg;
+    stack[0].specs = specs;
     stack[0].flags = pkg_DIRECT | pkg_PUBLIC;
 
     while (top >= 0) {
         procstate *s = stack + top;
-        if (s->flags & pkg_NEW) {
-            prepend(&pkgs, s->last);
-            s->flags &= ~pkg_NEW;
+        if (s->newpkg) {
+            prepend(&pkgs, s->newpkg);
+            s->newpkg = 0;
         }
-        s8pair pair = nexttoken(s->arg);
-        s8 tok = pair.head;
-        if (!tok.len) {
-            if (s->op) {
-                procfail(err, s->op, s->last);
-            }
+
+        pkgspec *spec = s->specs;
+        if (!spec) {
             top--;
             continue;
         }
-        stack[top].arg = pair.tail;
+        s->specs = spec->next;
 
-        if (s->op) {
-            if (!proc->ignore_versions) {
-                i32 cmp = compareversions(s->last->version, tok);
-                if (!validcompare(s->op, cmp)) {
-                    failversion(err, s->last, s->op, tok);
-                }
-            }
-            s->last = 0;
-            s->op = versop_ERR;
-            continue;
-        }
-
-        s->op = parseop(tok);
-        if (s->op) {
-            if (!s->last) {
-                prints8(err, S("pkg-config: "));
-                prints8(err, S("unexpected operator '"));
-                prints8(err, tok);
-                prints8(err, S("'\n"));
-                flush(err);
-                os_fail();
-            }
-            continue;
-        }
+        s8 realname = pathtorealname(spec->name);
+        pkg *p = locate(&pkgs, realname, perm);
 
         i32 depth = s->depth + 1;
         i32 flags = s->flags;
-        pkg *p = s->last = locate(&pkgs, pathtorealname(tok), perm);
         if (p->contents.s) {
             if (flags&pkg_PUBLIC && !(p->flags & pkg_PUBLIC)) {
                 // We're on a public branch, but this package was
@@ -1512,40 +1501,44 @@ static pkgs process(processor *proc, s8 arg, arena *perm)
                 p->flags |= pkg_PUBLIC;
                 if (proc->recursive && depth<proc->maxdepth) {
                     if (top >= cap-1) {
-                        failmaxrecurse(err, tok);
+                        failmaxrecurse(err, p->name);
                     }
                     top++;
-                    stack[top].arg = p->requires;
-                    stack[top].last = 0;
+                    stack[top].specs = p->specs_requires;
                     stack[top].depth = depth;
                     stack[top].flags = flags & ~pkg_DIRECT;
-                    stack[top].op = versop_ERR;
                 }
             }
+
         } else {
             // Package hasn't been loaded yet, so find and load it.
-            s->flags |= pkg_NEW;
-            pkg newpkg = findpackage(search, err, tok, perm);
+            s->newpkg = p;
+            pkg newpkg = findpackage(search, err, spec->name, perm);
             if (proc->define_prefix) {
                 setprefix(&newpkg, perm);
             }
             expandmerge(err, *global, p, &newpkg, perm);
+
+            if (spec->op && !proc->ignore_versions) {
+                i32 cmp = compareversions(p->version, spec->version);
+                if (!validcompare(spec->op, cmp)) {
+                    failversion(err, p, spec->op, spec->version);
+                }
+            }
+
             if (proc->recursive && depth<proc->maxdepth) {
                 if (top >= cap-2) {
-                    failmaxrecurse(err, tok);
+                    failmaxrecurse(err, p->name);
                 }
                 top++;
-                stack[top].arg = p->requires;
-                stack[top].last = 0;
+                stack[top].specs = p->specs_requires;
                 stack[top].depth = depth;
                 stack[top].flags = flags & ~pkg_DIRECT;
-                stack[top].op = versop_ERR;
+
                 top++;
-                stack[top].arg = p->requiresprivate;
-                stack[top].last = 0;
+                stack[top].specs = p->specs_requiresprivate;
                 stack[top].depth = depth;
                 stack[top].flags = 0;
-                stack[top].op = versop_ERR;
             }
         }
         p->flags |= flags;
@@ -2016,8 +2009,8 @@ static void uconfig(config *conf)
         err = newnullout(perm);
     }
 
-    s8 fullargs = joinargs(perm, args, nargs);
-    pkgs pkgs = process(proc, fullargs, perm);
+    pkgspec *specs = parsespecs(args, nargs, 0, err, perm);
+    pkgs pkgs = process(proc, specs, perm);
 
     if (!pkgs.count) {
         prints8(err, S("pkg-config: "));
