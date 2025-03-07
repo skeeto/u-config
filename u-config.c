@@ -502,8 +502,7 @@ enum { pkg_DIRECT=1<<0, pkg_PUBLIC=1<<1, pkg_NEW=1<<2 };
 typedef struct pkg pkg;
 struct pkg {
     pkg *child[4];
-    pkg *next;  // total load order list
-    pkg *prev;
+    pkg *list;  // total load order list
     s8   path;
     s8   realname;
     s8   contents;
@@ -555,7 +554,6 @@ static s8 *fieldbyname(pkg *p, s8 name)
 typedef struct {
     pkg  *pkgs;
     pkg  *head;
-    pkg  *tail;
     size  count;
 } pkgs;
 
@@ -584,21 +582,15 @@ static pkg *locate(pkgs *t, s8 realname, arena *perm)
 
 static void prepend(pkgs *t, pkg *p)
 {
-    assert(!p->next && !p->prev);
-    pkg *h = t->head;
-    if (!h) {
-        t->head = t->tail = p;
-    } else {
-        t->head = p;
-        h->prev = p;
-        p->next = h;
-    }
+    assert(!p->list);
+    p->list = t->head;
+    t->head = p;
 }
 
 static b32 allpresent(pkgs *t)
 {
     size count = 0;
-    for (pkg *p = t->head; p; p = p->next) {
+    for (pkg *p = t->head; p; p = p->list) {
         count++;
     }
     return count == t->count;
@@ -1327,60 +1319,47 @@ static b32 validcompare(versop op, i32 result)
 
 // Command line arguments are processed as one long string joined with
 // whitespace, just like dependency listings inside a .pc file. To
-// simplify processing, literally concatenate them. When processing
-// recursively, concatenate inputs in reverse order while maintaining
-// the operator tuples.
-static s8 joinargs(arena *a, s8 *args, size nargs, b32 recursive)
+// simplify processing, literally concatenate them in reverse order while
+// maintaining the operator tuples.
+static s8 joinargs(arena *a, s8 *args, size nargs)
 {
     u8buf b = newmembuf(a);
 
-    if (!recursive) {
-        // Concatenate arguments in order into one string
-        for (size i = 0; i < nargs; i++) {
-            if (i) {
+    s8   null = {0};
+    s8   hold = {0};
+    versop op = 0;
+
+    for (size i = nargs-1; i >= 0; i--) {
+        for (s8pair p = lasttoken(args[i]); p.tail.len; p = lasttoken(p.head)) {
+            s8 tok = p.tail;
+
+            if (op) {
                 prints8(&b, S(" "));
-            }
-            prints8(&b, args[i]);
-        }
+                prints8(&b, tok);
+                prints8(&b, S(" "));
+                prints8(&b, opname(op));
+                prints8(&b, S(" "));
+                prints8(&b, hold);
+                hold = null;
+                op = 0;
 
-    } else {
-        // Concatenate in reverse order, maintaining operation tuples
-        s8   null = {0};
-        s8   hold = {0};
-        versop op = 0;
-
-        for (size i = nargs-1; i >= 0; i--) {
-            for (s8pair p = lasttoken(args[i]); p.tail.len; p = lasttoken(p.head)) {
-                s8 tok = p.tail;
-
-                if (op) {
-                    prints8(&b, S(" "));
-                    prints8(&b, tok);
-                    prints8(&b, S(" "));
-                    prints8(&b, opname(op));
+            } else if (!(op = parseop(tok))) {
+                if (hold.s) {
                     prints8(&b, S(" "));
                     prints8(&b, hold);
-                    hold = null;
-                    op = 0;
-
-                } else if (!(op = parseop(tok))) {
-                    if (hold.s) {
-                        prints8(&b, S(" "));
-                        prints8(&b, hold);
-                    }
-                    hold = tok;
                 }
+                hold = tok;
             }
         }
+    }
 
-        if (op) {
-            prints8(&b, S(" "));
-            prints8(&b, opname(op));
-        }
-        if (hold.s) {
-            prints8(&b, S(" "));
-            prints8(&b, hold);
-        }
+    if (op) {
+        prints8(&b, S(" "));
+        prints8(&b, opname(op));
+    }
+    if (hold.s) {
+        prints8(&b, S(" "));
+        prints8(&b, hold);
     }
 
     return finalize(&b);
@@ -2044,7 +2023,7 @@ static void uconfig(config *conf)
         err = newnullout(perm);
     }
 
-    s8 fullargs = joinargs(perm, args, nargs, proc->recursive);
+    s8 fullargs = joinargs(perm, args, nargs);
     process(proc, fullargs, perm);
 
     if (!pkgs->count) {
@@ -2056,7 +2035,7 @@ static void uconfig(config *conf)
 
     // --{atleast,exact,max}-version
     if (override_op) {
-        for (pkg *p = pkgs->tail; p; p = p->prev) {
+        for (pkg *p = pkgs->head; p; p = p->list) {
             i32 cmp = compareversions(p->version, override_version);
             if (!validcompare(override_op, cmp)) {
                 failversion(err, p, override_op, override_version);
@@ -2065,7 +2044,7 @@ static void uconfig(config *conf)
     }
 
     if (modversion) {
-        for (pkg *p = pkgs->tail; p; p = p->prev) {
+        for (pkg *p = pkgs->head; p; p = p->list) {
             if (p->flags & pkg_DIRECT) {
                 prints8(out, p->version);
                 prints8(out, S("\n"));
@@ -2074,7 +2053,7 @@ static void uconfig(config *conf)
     }
 
     if (variable.s) {
-        for (pkg *p = pkgs->tail; p; p = p->prev) {
+        for (pkg *p = pkgs->head; p; p = p->list) {
             if (p->flags & pkg_DIRECT) {
                 s8 value = lookup(global, p->env, variable);
                 if (value.s) {
@@ -2093,7 +2072,7 @@ static void uconfig(config *conf)
         if (!print_sysinc) {
             insertsyspath(&fw, conf->sys_incpath, conf->delim, 'I');
         }
-        for (pkg *p = pkgs->head; p; p = p->next) {
+        for (pkg *p = pkgs->head; p; p = p->list) {
             appendfield(err, &fw, p, p->cflags);
         }
         writeargs(out, &fw);
@@ -2107,7 +2086,7 @@ static void uconfig(config *conf)
         if (!print_syslib) {
             insertsyspath(&fw, conf->sys_libpath, conf->delim, 'L');
         }
-        for (pkg *p = pkgs->head; p; p = p->next) {
+        for (pkg *p = pkgs->head; p; p = p->list) {
             if (static_) {
                 appendfield(err, &fw, p, p->libs);
                 appendfield(err, &fw, p, p->libsprivate);
