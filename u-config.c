@@ -1325,8 +1325,14 @@ static s8 joinargs(arena *a, s8 *args, size nargs)
     versop op = 0;
 
     for (size i = nargs-1; i >= 0; i--) {
-        for (s8pair p = lasttoken(args[i]); p.tail.len; p = lasttoken(p.head)) {
+        s8pair p = {0};
+        p.head = args[i];
+        for (;;) {
+            p = lasttoken(p.head);
             s8 tok = p.tail;
+            if (!tok.len) {
+                break;
+            }
 
             if (op) {
                 prints8(&b, S(" "));
