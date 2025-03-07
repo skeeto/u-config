@@ -1350,10 +1350,7 @@ static s8 joinargs(arena *a, s8 *args, size nargs, b32 recursive)
         versop op = 0;
 
         for (size i = nargs-1; i >= 0; i--) {
-            s8pair p = {0};
-            p.head = args[i];
-            while (p.head.len) {
-                p = lasttoken(p.head);
+            for (s8pair p = lasttoken(args[i]); p.tail.len; p = lasttoken(p.head)) {
                 s8 tok = p.tail;
 
                 if (op) {
