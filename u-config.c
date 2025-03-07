@@ -236,20 +236,37 @@ static b32 tokenspace(u8 c)
     return whitespace(c) || c==',';
 }
 
-static s8 skiptokenspace(s8 s)
+static s8 skiptokenspaceleft(s8 s)
 {
     for (; s.len && tokenspace(*s.s); s = cuthead(s, 1)) {}
     return s;
 }
 
+static s8 skiptokenspaceright(s8 s)
+{
+    for (; s.len && tokenspace(s.s[s.len-1]); s = cuttail(s, 1)) {}
+    return s;
+}
+
 static s8pair nexttoken(s8 s)
 {
-    s = skiptokenspace(s);
+    s = skiptokenspaceleft(s);
     size len = 0;
     for (; len<s.len && !tokenspace(s.s[len]); len++) {}
     s8pair r = {0};
     r.head = takehead(s, len);
     r.tail = cuthead(s, len);
+    return r;
+}
+
+static s8pair lasttoken(s8 s)
+{
+    s = skiptokenspaceright(s);
+    size len = 0;
+    for (; len<s.len && !tokenspace(s.s[s.len-len-1]); len++) {}
+    s8pair r = {0};
+    r.head = takehead(s, s.len-len);
+    r.tail = cuthead(s, s.len-len);
     return r;
 }
 
@@ -1308,6 +1325,70 @@ static b32 validcompare(versop op, i32 result)
     assert(0);
 }
 
+// Command line arguments are processed as one long string joined with
+// whitespace, just like dependency listings inside a .pc file. To
+// simplify processing, literally concatenate them. When processing
+// recursively, concatenate inputs in reverse order while maintaining
+// the operator tuples.
+static s8 joinargs(arena *a, s8 *args, size nargs, b32 recursive)
+{
+    u8buf b = newmembuf(a);
+
+    if (!recursive) {
+        // Concatenate arguments in order into one string
+        for (size i = 0; i < nargs; i++) {
+            if (i) {
+                prints8(&b, S(" "));
+            }
+            prints8(&b, args[i]);
+        }
+
+    } else {
+        // Concatenate in reverse order, maintaining operation tuples
+        s8   null = {0};
+        s8   hold = {0};
+        versop op = 0;
+
+        for (size i = nargs-1; i >= 0; i--) {
+            s8pair p = {0};
+            p.head = args[i];
+            while (p.head.len) {
+                p = lasttoken(p.head);
+                s8 tok = p.tail;
+
+                if (op) {
+                    prints8(&b, S(" "));
+                    prints8(&b, tok);
+                    prints8(&b, S(" "));
+                    prints8(&b, opname(op));
+                    prints8(&b, S(" "));
+                    prints8(&b, hold);
+                    hold = null;
+                    op = 0;
+
+                } else if (!(op = parseop(tok))) {
+                    if (hold.s) {
+                        prints8(&b, S(" "));
+                        prints8(&b, hold);
+                    }
+                    hold = tok;
+                }
+            }
+        }
+
+        if (op) {
+            prints8(&b, S(" "));
+            prints8(&b, opname(op));
+        }
+        if (hold.s) {
+            prints8(&b, S(" "));
+            prints8(&b, hold);
+        }
+    }
+
+    return finalize(&b);
+}
+
 typedef struct {
     s8     arg;
     pkg   *last;
@@ -1321,9 +1402,7 @@ typedef struct {
     search    search;
     env     **global;
     pkgs     *pkgs;
-    pkg      *last;
     i32       maxdepth;
-    versop    op;
     b32       define_prefix;
     b32       recursive;
     b32       ignore_versions;
@@ -1407,11 +1486,9 @@ static void process(processor *proc, s8 arg, arena *perm)
     procstate *stack = proc->stack;
     i32 cap = countof(proc->stack);
     i32 top = 0;
+    stack[0] = (procstate){0};
     stack[0].arg = arg;
-    stack[0].last = proc->last;
-    stack[0].depth = 0;
     stack[0].flags = pkg_DIRECT | pkg_PUBLIC;
-    stack[0].op = proc->op;
 
     while (top >= 0) {
         procstate *s = stack + top;
@@ -1422,7 +1499,7 @@ static void process(processor *proc, s8 arg, arena *perm)
         s8pair pair = nexttoken(s->arg);
         s8 tok = pair.head;
         if (!tok.len) {
-            if (top>0 && s->op) {
+            if (s->op) {
                 procfail(err, s->op, s->last);
             }
             top--;
@@ -1505,16 +1582,6 @@ static void process(processor *proc, s8 arg, arena *perm)
         p->flags |= flags;
     }
     assert(allpresent(pkgs));
-
-    proc->last = stack[0].last;
-    proc->op = stack[0].op;
-}
-
-static void endprocessor(processor *proc, u8buf *err)
-{
-    if (proc->op) {
-        procfail(err, proc->op, 0);
-    }
 }
 
 typedef enum {
@@ -1980,10 +2047,8 @@ static void uconfig(config *conf)
         err = newnullout(perm);
     }
 
-    for (size i = 0; i < nargs; i++) {
-        process(proc, args[i], perm);
-    }
-    endprocessor(proc, err);
+    s8 fullargs = joinargs(perm, args, nargs, proc->recursive);
+    process(proc, fullargs, perm);
 
     if (!pkgs->count) {
         prints8(err, S("pkg-config: "));

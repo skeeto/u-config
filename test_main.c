@@ -154,7 +154,7 @@ static void test_dashdash(void)
     SHOULDPASS {
         run(conf, S("--cflags"), S("--"), S("--foo"), S("--"), E);
     }
-    EXPECT("-Ddashdash -Dfoo\n");
+    EXPECT("-Dfoo -Ddashdash\n");
 }
 
 static void test_modversion(void)
@@ -452,7 +452,7 @@ static void test_libsorder(void)
 {
     // Scenario: two packages link a common library
     // Expect: the common library is listed after both, other flags
-    //   are de-duplicated
+    //   maintain their first-seen position and de-duplicate the rest
     config conf = newtest_(S("library ordering"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
@@ -467,7 +467,7 @@ static void test_libsorder(void)
     SHOULDPASS {
         run(conf, S("--cflags"), S("--libs"), S("a b"), E);
     }
-    EXPECT("-DB -DGL -DA -L/opt/lib -pthread -mwindows -lb -la -lopengl32\n");
+    EXPECT("-DA -DGL -DB -L/opt/lib -pthread -mwindows -la -lb -lopengl32\n");
 }
 
 static void test_staticorder(void)
