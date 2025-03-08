@@ -110,7 +110,7 @@ static size s8find_(s8 haystack, s8 needle)
         size beg = i - needle.len + 1;
         s8 tail = cuthead(haystack, beg);
         if (hash==match && startswith(tail, needle)) {
-            return i;
+            return beg;
         }
         hash -= f * haystack.s[beg];
     }
