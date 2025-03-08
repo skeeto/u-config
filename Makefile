@@ -1,3 +1,9 @@
+# NOTE TO DISTRIBUTION PACKAGE MAINTAINERS: The targets in this Makefile
+# are intended only for development, testing, and evaluation. If you are
+# packaging u-config for a distribution, invoke a compiler directly on
+# the appropriate *_main.c source. See "Build" in README.md for more
+# information, and "Configuration" for a list of configuration options.
+
 CROSS = x86_64-w64-mingw32-
 CC    = gcc
 OPT   = -Os
