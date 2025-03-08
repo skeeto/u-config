@@ -1481,13 +1481,13 @@ static pkgs process(processor *proc, pkgspec *specs, arena *perm)
             s->newpkg = 0;
         }
 
-        if (!s->specs) {
+        pkgspec *spec = s->specs;
+        if (!spec) {
             top--;
             continue;
         }
 
-        pkgspec *spec = s->specs;
-        s->specs = s->specs->next;
+        s->specs = spec->next;
 
         s8 realname = pathtorealname(spec->name);
         pkg *p = locate(&pkgs, realname, perm);
