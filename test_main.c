@@ -31,6 +31,13 @@
         fflush(stdout); \
         __builtin_trap(); \
     }
+#define MATCH(w) \
+    if (s8find_(context.output, S(w)) == context.output.len) { \
+        printf("MATCH:  %s\n", w); \
+        printf("OUTPUT: %.*s", (int)context.output.len, context.output.s); \
+        fflush(stdout); \
+        __builtin_trap(); \
+    }
 
 static struct {
     jmp_buf exit;
@@ -73,11 +80,41 @@ static filemap os_mapfile(arena *perm, s8 path)
 static void os_write(i32 fd, s8 s)
 {
     assert(fd==1 || fd==2);
-    if (fd == 1) {
-        assert(context.outavail.len >= s.len);
-        context.outavail = s8copy(context.outavail, s);
-        context.output.len += s.len;
+    assert(context.outavail.len >= s.len);
+    context.outavail = s8copy(context.outavail, s);
+    context.output.len += s.len;
+}
+
+// Return needle offset, or the length of haystack on no match.
+static size s8find_(s8 haystack, s8 needle)
+{
+    u32 match = 0;
+    for (size i = 0; i < needle.len; i++) {
+        match = match*257u + needle.s[i];
     }
+
+    u32 f = 1;
+    u32 x = 257;
+    for (size n = needle.len-1; n>0; n /= 2) {
+        f *= n&1 ? x : 1;
+        x *= x;
+    }
+
+    size i = 0;
+    u32 hash = 0;
+    for (; i<needle.len-1 && i<haystack.len; i++) {
+        hash = hash*257u + haystack.s[i];
+    }
+    for (; i < haystack.len; i++) {
+        hash = hash*257u + haystack.s[i];
+        size beg = i - needle.len + 1;
+        s8 tail = cuthead(haystack, beg);
+        if (hash==match && startswith(tail, needle)) {
+            return i;
+        }
+        hash -= f * haystack.s[beg];
+    }
+    return haystack.len;
 }
 
 static config newtest_(s8 name)
@@ -598,6 +635,108 @@ static void test_parens(void)
     );
 }
 
+static void test_error_messages(void)
+{
+    // Check that error messages mention important information
+    config conf = newtest_(S("error messages"));
+    newfile_(&conf, S("/usr/lib/pkgconfig/badpkg.pc"), S(
+        PCHDR
+        "Requires: < 1\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/goodpkg.pc"), S(
+        PCHDR
+        "Requires: badpkg\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/missingversion.pc"), S(
+        PCHDR
+        "Requires: pkg-config >\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/toodeep.pc"), S(
+        PCHDR
+        "Requires: ${x}\n"
+        "x = x${x}\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/undefinedvar.pc"), S(
+        PCHDR
+        "Requires: ${whatisthis}\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/dupvar.pc"), S(
+        PCHDR
+        "toomanydefs = a\n"
+        "toomanydefs = b\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/missingfield.pc"), S(
+        "Name:\n"
+        "Version:\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/versionedpkg.pc"), S(
+        "Name:\n"
+        "Version: 2\n"
+        "Description:\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/badquotes.pc"), S(
+        PCHDR
+        "Cflags: ${x}\n"
+        "x = -I\"\n"
+    ));
+
+    SHOULDFAIL {
+        run(conf, S("--cflags"), S("nonexistingpkg"), E);
+    }
+    MATCH("nonexistingpkg");
+
+    SHOULDFAIL {  // direct
+        run(conf, S("--cflags"), S("badpkg"), E);
+    }
+    MATCH("badpkg");
+
+    SHOULDFAIL {  // indirect
+        run(conf, S("--cflags"), S("goodpkg"), E);
+    }
+    MATCH("badpkg");
+
+    SHOULDFAIL {
+        run(conf, S("--cflags"), S("missingversion"), E);
+    }
+    MATCH("missingversion");
+
+    SHOULDFAIL {
+        run(conf, S("--cflags"), S("toodeep"), E);
+    }
+    MATCH("toodeep");
+
+    SHOULDFAIL {
+        run(conf, S("--cflags"), S("undefinedvar"), E);
+    }
+    MATCH("undefinedvar");
+    MATCH("whatisthis");
+
+    SHOULDFAIL {
+        run(conf, S("--cflags"), S("dupvar"), E);
+    }
+    MATCH("dupvar");
+    MATCH("toomanydefs");
+
+    SHOULDFAIL {
+        run(conf, S("--cflags"), S("missingfield"), E);
+    }
+    MATCH("missingfield");
+    MATCH("Description");
+
+    SHOULDFAIL {
+        run(conf, S("--cflags"), S("versionedpkg = 1"), E);
+    }
+    MATCH("versionedpkg");
+    MATCH("'1'");
+    MATCH("'2'");
+
+    SHOULDFAIL {
+        run(conf, S("--cflags"), S("badquotes"), E);
+    }
+    MATCH("unmatched");
+    MATCH("badquotes");
+}
+
 static void printi32_(u8buf *out, i32 x)
 {
     u8  buf[32];
@@ -668,6 +807,7 @@ static void test_lol(void)
     SHOULDFAIL {
         run(conf, S("--modversion"), S("lol.pc"), E);
     }
+    MATCH("out of memory");
 }
 
 static arena newarena_(size cap)
@@ -699,6 +839,7 @@ int main(void)
     test_staticorder();
     test_windows();
     test_parens();
+    test_error_messages();
     test_manyvars();
     test_lol();
 
