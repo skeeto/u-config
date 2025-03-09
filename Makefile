@@ -16,6 +16,13 @@ WIN32_LIBS   = -s -nostdlib -Wl,--gc-sections -lkernel32
 LINUX_CFLAGS = -fno-builtin -fno-pie -fno-asynchronous-unwind-tables
 LINUX_LIBS   = -static -s -no-pie -nostdlib -Wl,--gc-sections
 
+default:
+	@echo 'No sensible default target. Makefile is intended for development'
+	@echo 'and testing. See "Build" and "Configuration" in README.md. Use the'
+	@echo '"pkg-config" target to copy your system pkg-config configuration'
+	@echo 'for evaluation and comparison.'
+	@exit 1
+
 pkg-config.exe: win32_main.c cmdline.c miniwin32.h u-config.c
 	$(CROSS)$(CC) $(OPT) $(WIN32_CFLAGS) -o $@ win32_main.c $(WIN32_LIBS)
 
