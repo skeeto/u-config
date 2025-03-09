@@ -1406,6 +1406,7 @@ typedef struct {
     b32       define_prefix;
     b32       recursive;
     b32       ignore_versions;
+    b32       static_;
     procstate stack[256];
 } processor;
 
@@ -1527,7 +1528,7 @@ static pkgs process(processor *proc, pkgspec *specs, arena *perm)
             }
 
             if (proc->recursive && depth<proc->maxdepth) {
-                if (top >= cap-2) {
+                if (top >= cap-(1+proc->static_)) {
                     failmaxrecurse(err, p->name);
                 }
                 top++;
@@ -1535,10 +1536,12 @@ static pkgs process(processor *proc, pkgspec *specs, arena *perm)
                 stack[top].depth = depth;
                 stack[top].flags = flags & ~pkg_DIRECT;
 
-                top++;
-                stack[top].specs = p->specs_requiresprivate;
-                stack[top].depth = depth;
-                stack[top].flags = 0;
+                if (proc->static_) {
+                    top++;
+                    stack[top].specs = p->specs_requiresprivate;
+                    stack[top].depth = depth;
+                    stack[top].flags = 0;
+                }
             }
         }
         p->flags |= flags;
@@ -1800,7 +1803,6 @@ static void uconfig(config *conf)
     b32 cflags = 0;
     b32 err_to_stdout = 0;
     b32 silent = 0;
-    b32 static_ = 0;
     u8 argdelim = ' ';
     b32 modversion = 0;
     versop override_op = versop_ERR;
@@ -1871,7 +1873,7 @@ static void uconfig(config *conf)
             variable = r.value;
 
         } else if (s8equals(r.arg, S("-static"))) {
-            static_ = 1;
+            proc->static_ = 1;
 
         } else if (s8equals(r.arg, S("-libs-only-L"))) {
             libs = 1;
@@ -2073,7 +2075,7 @@ static void uconfig(config *conf)
             insertsyspath(&fw, conf->sys_libpath, conf->delim, 'L');
         }
         for (pkg *p = pkgs.head; p; p = p->list) {
-            if (static_) {
+            if (proc->static_) {
                 appendfield(err, &fw, p, p->libs);
                 appendfield(err, &fw, p, p->libsprivate);
             } else if (p->flags & pkg_PUBLIC) {
