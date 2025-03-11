@@ -553,7 +553,7 @@ struct pkg {
     pkgspec *specs_requiresprivate;
     i32      flags;
 
-    #define PKG_NFIELDS 10
+    #define PKG_NFIELDS 11
     s8 name;
     s8 description;
     s8 url;
@@ -564,6 +564,7 @@ struct pkg {
     s8 libs;
     s8 libsprivate;
     s8 cflags;
+    s8 cflagsprivate;
 };
 
 static s8 *fieldbyid(pkg *p, i32 id)
@@ -585,7 +586,8 @@ static s8 *fieldbyname(pkg *p, s8 name)
         s8("Conflicts"),
         s8("Libs"),
         s8("Libs.private"),
-        s8("Cflags")
+        s8("Cflags"),
+        s8("Cflags.private")
     };
     for (i32 i = 0; i < countof(fields); i++) {
         if (s8equals(fields[i], name)) {
@@ -2062,6 +2064,9 @@ static void uconfig(config *conf)
         }
         for (pkg *p = pkgs.head; p; p = p->list) {
             appendfield(err, &fw, p, p->cflags);
+            if (proc->static_) {
+                appendfield(err, &fw, p, p->cflagsprivate);
+            }
         }
         writeargs(out, &fw);
     }

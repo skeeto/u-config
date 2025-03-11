@@ -377,6 +377,66 @@ static void test_maximum_traverse_depth(void)
     EXPECT("-Da -Db -Dc\n");
 }
 
+static void test_private_cflags(void)
+{
+    // Scenario: a has private cflags
+    // Expect: --cflags should not output it unless --static is also given
+    config conf = newtest_(S("private cflags"));
+    newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
+        PCHDR
+        "Cflags: -DA_PUB\n"
+        "Cflags.private: -DA_PRIV\n"
+        "Libs: -la\n"
+    ));
+    // Scenario: b has private cflags and so does its dependencies
+    // Expect: only output private flags if --static is given
+    newfile_(&conf, S("/usr/lib/pkgconfig/b.pc"), S(
+        PCHDR
+        "Cflags: -DB_PUB\n"
+        "Cflags.private: -DB_PRIV\n"
+        "Libs: -lb\n"
+        "Requires: c\n"
+        "Requires.private: d\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/c.pc"), S(
+        PCHDR
+        "Cflags: -DC_PUB\n"
+        "Cflags.private: -DC_PRIV\n"
+        "Libs: -lc\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/d.pc"), S(
+        PCHDR
+        "Cflags: -DD_PUB\n"
+        "Cflags.private: -DD_PRIV\n"
+        "Libs: -ld\n"
+    ));
+
+    SHOULDPASS {
+        run(conf, S("--cflags"), S("a"), E);
+    }
+    EXPECT("-DA_PUB\n");
+
+    SHOULDPASS {
+        run(conf, S("--static"), S("--cflags"), S("a"), E);
+    }
+    EXPECT("-DA_PUB -DA_PRIV\n");
+
+    SHOULDPASS {
+        run(conf, S("--libs"), S("--static"), S("a"), E);
+    }
+    EXPECT("-la\n");
+
+    SHOULDPASS {
+        run(conf, S("--cflags"), S("b"), E);
+    }
+    EXPECT("-DB_PUB -DC_PUB\n");
+
+    SHOULDPASS {
+        run(conf, S("--cflags"), S("--static"), S("b"), E);
+    }
+    EXPECT("-DB_PUB -DB_PRIV -DC_PUB -DC_PRIV -DD_PUB -DD_PRIV\n");
+}
+
 static void test_private_transitive(void)
 {
     // Scenario: a privately requires b which publicly requires c
@@ -877,6 +937,7 @@ int main(void)
     test_versionorder();
     test_overrides();
     test_maximum_traverse_depth();
+    test_private_cflags();
     test_private_transitive();
     test_private_non_existing();
     test_revealed_transitive();
