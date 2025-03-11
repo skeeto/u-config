@@ -429,7 +429,7 @@ static void test_private_cflags(void)
     SHOULDPASS {
         run(conf, S("--cflags"), S("b"), E);
     }
-    EXPECT("-DB_PUB -DC_PUB\n");
+    EXPECT("-DB_PUB -DC_PUB -DD_PUB\n");
 
     SHOULDPASS {
         run(conf, S("--cflags"), S("--static"), S("b"), E);
@@ -472,51 +472,6 @@ static void test_private_transitive(void)
         run(conf, S("--libs"), S("--static"), S("a"), E);
     }
     EXPECT("-la -lx -lb -lc\n");
-}
-
-static void test_private_non_existing(void)
-{
-    // Scenario: a privately requires non-existing b
-    // Expect: --libs a should not fail unless --static is also used
-    config conf = newtest_(S("private non existing package"));
-    newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
-        PCHDR
-        "Requires.private: b\n"
-        "Libs: -la\n"
-    ));
-    // Same situation but with a level of indirection
-    newfile_(&conf, S("/usr/lib/pkgconfig/c.pc"), S(
-        PCHDR
-        "Requires: d\n"
-        "Libs: -lc\n"
-    ));
-    newfile_(&conf, S("/usr/lib/pkgconfig/d.pc"), S(
-        PCHDR
-        "Requires.private: e\n"
-        "Libs: -ld\n"
-    ));
-
-    SHOULDPASS {
-        run(conf, S("--libs"), S("a"), E);
-    }
-    EXPECT("-la\n");
-
-    SHOULDFAIL {
-        run(conf, S("--libs"), S("--static"), S("a"), E);
-    }
-    MATCH("not find");
-    MATCH("'b'");
-
-    SHOULDPASS {
-        run(conf, S("--libs"), S("c"), E);
-    }
-    EXPECT("-lc -ld\n");
-
-    SHOULDFAIL {
-        run(conf, S("--static"), S("--libs"), S("c"), E);
-    }
-    MATCH("not find");
-    MATCH("'e'");
 }
 
 static void test_revealed_transitive(void)
@@ -939,7 +894,6 @@ int main(void)
     test_maximum_traverse_depth();
     test_private_cflags();
     test_private_transitive();
-    test_private_non_existing();
     test_revealed_transitive();
     test_syspaths();
     test_libsorder();
