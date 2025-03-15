@@ -740,6 +740,15 @@ static void test_error_messages(void)
         "x = -I\"\n"
     ));
 
+    SHOULDFAIL { // should be silent
+        run(conf, S("--exists"), S("nonexistingpkg"), E);
+    }
+    EXPECT("");
+    SHOULDFAIL {
+        run(conf, S("--atleast-version"), S("9"), S("nonexistingpkg"), E);
+    }
+    EXPECT("");
+
     SHOULDFAIL {
         run(conf, S("--cflags"), S("nonexistingpkg"), E);
     }

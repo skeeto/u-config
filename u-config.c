@@ -2004,11 +2004,11 @@ static void uconfig(config *conf)
     }
 
     if (err_to_stdout) {
-        err = out;
+        proc->err = err = out;
     }
 
     if (silent) {
-        err = newnullout(perm);
+        proc->err = err = newnullout(perm);
     }
 
     pkgspec *specs = parsespecs(args, nargs, 0, err, perm);
