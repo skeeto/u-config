@@ -61,18 +61,23 @@ backslash syntax.
 
 u-config compiles as one translation unit. Choose an appropriate platform
 layer (`main_*.c`) for your target then invoke your C compiler only that
-source file. The unadorned `main.c` is libc so it works everywhere, but
-inherits the target's libc limitations (restricted path and environment
-variable access, no automatic self-configuration, etc.).
+source file. The unadorned `main.c` is "generic" libc and mostly works
+everywhere, but inherits the target's libc limitations (restricted path
+and environment variable access, no automatic self-configuration, etc.).
 
     $ cc -Os -o pkg-config main.c
 
-However, one of core goals is to be a reliable, native pkg-config for
-Windows, so it has a dedicated platform layer. This layer understands
-Unicode paths and environment variables — though keep in mind that it's
-probably interacting with tools that do not. It outputs arguments encoded
-in UTF-8 regardless of the system code page. Do not link a C runtime (CRT)
-in this configuration.
+Builds for POSIX hosts should prefer the POSIX platform layer instead of
+the generic libc platform:
+
+    $ cc -Os -o pkg-config main_posix.c
+
+Windows has a dedicated platform layer which understands Unicode paths and
+environment variables — though mind that it's probably interacting with
+tools that do not. It outputs UTF-8 regardless of the system code page. In
+general, u-config correctly processes paths with spaces, a feature that is
+especially important on Windows. Do not link a C runtime (CRT) in this
+configuration:
 
     $ cc -Os -nostartfiles -o pkg-config main_windows.c
 
@@ -99,7 +104,7 @@ drop-in replacement for it.
 
     $ make pkg-config   # grabs system's pkg-config search path
 
-### Generic configuration options
+### Generic and POSIX configuration options
 
 The "generic" platform has several compile time configuration parameters.
 Each must be formatted as a C string with quotes. Relative paths will be

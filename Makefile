@@ -33,12 +33,12 @@ pkg-config-debug.exe: main_windows.c $(src_windows)
 	$(CROSS)$(CC) -nostartfiles $(DEBUG_CFLAGS) -o $@ main_windows.c
 
 # Auto-configure using the system's pkg-config search path
-pkg-config: main.c src/u-config.c
-	$(CC) $(OPT) -o $@ main.c \
+pkg-config: main_posix.c src/u-config.c
+	$(CC) $(OPT) -o $@ main_posix.c \
 	  -DPKG_CONFIG_LIBDIR="\"$$($(PC) --variable pc_path pkg-config)\""
 
-pkg-config-debug: main.c src/u-config.c
-	$(CC) $(DEBUG_CFLAGS) -o $@ main.c
+pkg-config-debug: main_posix.c src/u-config.c
+	$(CC) $(DEBUG_CFLAGS) -o $@ main_posix.c
 
 # Auto-configure using the system's pkg-config search path
 pkg-config-linux-amd64: main_linux_amd64.c $(src_linux)
