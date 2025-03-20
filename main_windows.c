@@ -1,9 +1,9 @@
 // Mingw-w64 Win32 platform layer for u-config
-// $ cc -nostartfiles -o pkg-config win32_main.c
+// $ cc -nostartfiles -o pkg-config main_windows.c
 // This is free and unencumbered software released into the public domain.
-#include "u-config.c"
-#include "miniwin32.h"
-#include "cmdline.c"
+#include "src/u-config.c"
+#include "src/miniwin32.h"
+#include "src/cmdline.c"
 
 #ifndef PKG_CONFIG_PREFIX
 #  define PKG_CONFIG_PREFIX

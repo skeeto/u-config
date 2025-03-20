@@ -1,10 +1,10 @@
 // Win32 types, constants, and declarations (replaces windows.h)
 // This is free and unencumbered software released into the public domain.
 
-typedef __PTRDIFF_TYPE__ iptr;
-typedef __SIZE_TYPE__    uptr;
-typedef unsigned short   char16_t;
-typedef char16_t         c16;
+typedef ptrdiff_t       iptr;
+typedef size_t          uptr;
+typedef unsigned short  char16_t;
+typedef char16_t        c16;
 
 enum {
     FILE_ATTRIBUTE_NORMAL = 0x80,

@@ -1,8 +1,8 @@
 // afl fuzz test platform layer for u-config
-// $ afl-gcc-fast -fsanitize=undefined -fsanitize-trap fuzz_main.c
+// $ afl-gcc-fast -fsanitize=undefined -fsanitize-trap main_fuzz.c
 // $ afl-fuzz -i /usr/share/pkgconfig -o fuzzout ./a.out
 #define FUZZTEST
-#include "u-config.c"
+#include "src/u-config.c"
 #include <setjmp.h>
 #include <stdlib.h>
 #include <unistd.h>  // required by afl

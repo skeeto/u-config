@@ -2,14 +2,12 @@
 // On success prints "all tests pass" (for humans) and exits with a zero
 // status (for scripts). Attach a debugger to examine failures in detail.
 // This is free and unencumbered software released into the public domain.
-#ifndef __PTRDIFF_TYPE__  // not GCC-like?
-#  include <stddef.h>
-#  define __PTRDIFF_TYPE__         ptrdiff_t
+#ifndef __GNUC__
 #  define __builtin_unreachable()  *(volatile int *)0 = 0
 #  define __builtin_trap()         *(volatile int *)0 = 0
 #  define __attribute(x)
 #endif
-#include "u-config.c"
+#include "src/u-config.c"
 
 #include <setjmp.h>
 #include <stdarg.h>

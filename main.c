@@ -1,13 +1,11 @@
 // Generic C platform layer for u-config
 // This is free and unencumbered software released into the public domain.
 #define _CRT_SECURE_NO_WARNINGS
-#ifndef __PTRDIFF_TYPE__  // not GCC-like?
-#  include <stddef.h>
-#  define __PTRDIFF_TYPE__         ptrdiff_t
+#ifndef __GNUC__
 #  define __builtin_unreachable()  *(volatile int *)0 = 0
 #  define __attribute(x)
 #endif
-#include "u-config.c"
+#include "src/u-config.c"
 
 #include <stdio.h>
 #include <stdlib.h>

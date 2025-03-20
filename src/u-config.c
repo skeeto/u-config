@@ -1,13 +1,14 @@
 // u-config: a small, simple, portable pkg-config clone
 // https://github.com/skeeto/u-config
 // This is free and unencumbered software released into the public domain.
+#include <stddef.h>
 #define VERSION "0.33.3"
 
 typedef unsigned char    u8;
 typedef   signed int     b32;
 typedef   signed int     i32;
 typedef unsigned int     u32;
-typedef __PTRDIFF_TYPE__ size;
+typedef ptrdiff_t        size;
 typedef          char    byte;
 
 #define assert(c)     while (!(c)) __builtin_unreachable()

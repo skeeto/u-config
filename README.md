@@ -60,12 +60,12 @@ backslash syntax.
 ## Build
 
 u-config compiles as one translation unit. Choose an appropriate platform
-layer (`*_main.c`) for your target then invoke your C compiler only that
-source file. The "generic" platform is libc so it works everywhere, but
+layer (`main_*.c`) for your target then invoke your C compiler only that
+source file. The unadorned `main.c` is libc so it works everywhere, but
 inherits the target's libc limitations (restricted path and environment
 variable access, no automatic self-configuration, etc.).
 
-    $ cc -Os -o pkg-config generic_main.c
+    $ cc -Os -o pkg-config main.c
 
 However, one of core goals is to be a reliable, native pkg-config for
 Windows, so it has a dedicated platform layer. This layer understands
@@ -74,11 +74,11 @@ probably interacting with tools that do not. It outputs arguments encoded
 in UTF-8 regardless of the system code page. Do not link a C runtime (CRT)
 in this configuration.
 
-    $ cc -Os -nostartfiles -o pkg-config win32_main.c
+    $ cc -Os -nostartfiles -o pkg-config main_windows.c
 
 Or with MSVC:
 
-    $ cl /GS- /O2 /Os /Fe:pkg-config msvc_main.c
+    $ cl /GS- /O2 /Os /Fe:pkg-config main_msvc.c
 
 The Makefile documents compiler options for a more aggressively optimized
 GCC-based build.
@@ -156,7 +156,7 @@ order to reduce issues involving backslash as a shell metacharacter.
 
 ### libc-free Linux configuration options
 
-`linux_*_main.c` makes direct Linux system calls using assembly and does
+`main_linux_*.c` makes direct Linux system calls using assembly and does
 not require libc. It compiles to a ~20kB static executable that will work
 on any Linux distribution. It supports these configuration macros with the
 same behavior as the generic platform.
@@ -170,7 +170,7 @@ same behavior as the generic platform.
 Suggested debug build, intended to be run under a debugger:
 
     $ cc -g3 -Wall -Wextra -Wconversion -Wno-sign-conversion \
-         -fsanitize=undefined -fsanitize-trap PLATFORM_main.c
+         -fsanitize=undefined -fsanitize-trap main_PLATFORM.c
 
 Enabling Undefined Behavior Sanitizer also enables assertions.
 
@@ -178,14 +178,14 @@ Enabling Undefined Behavior Sanitizer also enables assertions.
 
 The test suite is a libc-based platform layer and runs u-config through
 its entry point in various configurations on a virtual file system. Either
-build and run `test_main.c` as a platform, or use the suggested test
+build and run `main_test.c` as a platform, or use the suggested test
 configuration in the Makefile (set `EXE=.exe` on Windows):
 
     $ make check
 
 ### Fuzz testing
 
-`fuzz_main.c` is a platform layer implemented on top of [AFL++][]. Fuzzer
+`main_fuzz.c` is a platform layer implemented on top of [AFL++][]. Fuzzer
 input is supplied through a virtual file, and it exercises `.pc` parsing,
 variable expansion, and output processing. Its header documents suggested
 usage.

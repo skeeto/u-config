@@ -1,15 +1,14 @@
 // libc-free platform layer for x86-64 Linux
 // This is free and unencumbered software released into the public domain.
-#include "u-config.c"
+#include "src/u-config.c"
 
 #define SYS_close 3
 #define SYS_exit  60
-#define SYS_mmap  9
 #define SYS_open  2
 #define SYS_read  0
 #define SYS_write 1
 
-#include "linux_noarch.c"
+#include "src/linux_noarch.c"
 
 asm (
     "        .globl _start\n"
@@ -48,21 +47,6 @@ static long syscall3(long n, long a, long b, long c)
         "syscall"
         : "=a"(r)
         : "a"(n), "D"(a), "S"(b), "d"(c)
-        : "rcx", "r11", "memory"
-    );
-    return r;
-}
-
-static long syscall6(long n, long a, long b, long c, long d, long e, long f)
-{
-    long r;
-    register long r10 asm("r10") = d;
-    register long r8  asm("r8")  = e;
-    register long r9  asm("r9")  = f;
-    asm volatile (
-        "syscall"
-        : "=a"(r)
-        : "a"(n), "D"(a), "S"(b), "d"(c), "r"(r10), "r"(r8), "r"(r9)
         : "rcx", "r11", "memory"
     );
     return r;

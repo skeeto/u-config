@@ -19,12 +19,11 @@
 
 // Arch-specific definitions, defined by the includer. Also requires
 // macro definitions for SYS_read, SYS_write, SYS_open, SYS_close,
-// SYS_mmap, SYS_exit. Arch-specific _start calls the arch-agnostic
-// entrypoint() with the process entry stack pointer.
+// SYS_exit. Arch-specific _start calls arch-agnostic entrypoint() with
+// the process entry stack pointer.
 static long syscall1(long, long);
 static long syscall2(long, long, long);
 static long syscall3(long, long, long, long);
-static long syscall6(long, long, long, long, long, long, long);
 
 static void os_fail(void)
 {
@@ -91,24 +90,17 @@ static s8 fromcstr_(u8 *z)
     return s;
 }
 
-static arena newarena_(void)
+static arena getarena_(void)
 {
-    arena a = {0};
-    size cap = 1<<22;
-    unsigned long p = syscall6(SYS_mmap, 0, cap, 3, 0x22, -1, 0);
-    if (p > -4096UL) {
-        a.beg = (byte *)16;  // aligned, non-null, zero-size arena
-        cap = 0;
-    } else {
-        a.beg = (byte *)p;
-    }
-    a.end = a.beg + cap;
-    return a;
+    static byte heap[1<<22];
+    byte *mem = heap;
+    asm ("" : "+r"(mem));  // launder
+    return (arena){mem, mem+countof(heap)};
 }
 
 static config *newconfig_(void)
 {
-    arena perm = newarena_();
+    arena perm = getarena_();
     config *conf = new(&perm, config, 1);
     conf->perm = perm;
     return conf;
