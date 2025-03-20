@@ -302,16 +302,6 @@ static s8 makepath_(arena *perm, s8 base, s8 lib, s8 share)
     return s;
 }
 
-static s8 fromcstr_(u8 *z)
-{
-    s8 s = {0};
-    s.s = z;
-    if (s.s) {
-        for (; s.s[s.len]; s.len++) {}
-    }
-    return s;
-}
-
 static config *newconfig_(os *ctx)
 {
     arena perm = newarena_(1<<22);
@@ -339,10 +329,7 @@ void mainCRTStartup(void)
     u8 **argv = new(perm, u8 *, CMDLINE_ARGV_MAX);
     c16 *cmdline = GetCommandLineW();
     conf->nargs = cmdline_to_argv8(cmdline, argv) - 1;
-    conf->args = new(perm, s8, conf->nargs);
-    for (iz i = 0; i < conf->nargs; i++) {
-        conf->args[i] = fromcstr_(argv[i+1]);
-    }
+    conf->args = argv + 1;
 
     s8 base  = installdir_(perm);
     s8 lib   = S(PKG_CONFIG_PREFIX "/lib/pkgconfig");

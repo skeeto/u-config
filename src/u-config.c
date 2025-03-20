@@ -32,8 +32,8 @@ typedef struct {
 
 typedef struct {
     arena perm;
-    s8   *args;
-    iz    nargs;
+    u8  **args;
+    i32   nargs;
     s8    pc_path;       // default compile time fixedpath
     s8    pc_sysincpath; // default compile time system include path
     s8    pc_syslibpath; // default compile time system library path
@@ -157,6 +157,16 @@ static s8 s8span(u8 *beg, u8 *end)
     s8 s = {0};
     s.s = beg;
     s.len = end - beg;
+    return s;
+}
+
+static s8 s8fromcstr(u8 *z)
+{
+    s8 s = {0};
+    if (z) {
+        s.s = (u8 *)z;
+        for (; s.s[s.len]; s.len++) {}
+    }
     return s;
 }
 
@@ -1833,10 +1843,15 @@ static void uconfig(config *conf)
     *insert(&global, S("pc_sysrootdir"), perm) = S("/");
     *insert(&global, S("pc_top_builddir"), perm) = top_builddir;
 
+    s8 *origargs = new(perm, s8, conf->nargs);
+    for (i32 i = 0; i < conf->nargs; i++) {
+        origargs[i] = s8fromcstr(conf->args[i]);
+    }
+
     s8 *args = new(perm, s8, conf->nargs);
     iz nargs = 0;
 
-    for (options opts = newoptions(conf->args, conf->nargs);;) {
+    for (options opts = newoptions(origargs, conf->nargs);;) {
         optresult r = nextoption(&opts);
         if (!r.ok) {
             break;

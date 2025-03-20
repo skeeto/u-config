@@ -49,14 +49,6 @@ static const char pkg_config_path[] =
     #endif
 ;
 
-static s8 fromcstr_(char *z)
-{
-    s8 s = {0};
-    s.s = (u8 *)z;
-    s.len = z ? strlen(z) : 0;
-    return s;
-}
-
 static arena newarena_(void)
 {
     iz cap = (iz)1<<22;
@@ -88,31 +80,28 @@ int main(int argc, char **argv)
         argc--;
         argv++;
     }
-    conf->args = new(&conf->perm, s8, argc);
+    conf->args = (u8 **)argv;
     conf->nargs = argc;
-    for (int i = 0; i < argc; i++) {
-        conf->args[i] = fromcstr_(argv[i]);
-    }
 
     conf->pc_path = S(pkg_config_path);
     conf->pc_sysincpath = S(PKG_CONFIG_SYSTEM_INCLUDE_PATH);
     conf->pc_syslibpath = S(PKG_CONFIG_SYSTEM_LIBRARY_PATH);
-    conf->envpath = fromcstr_(getenv("PKG_CONFIG_PATH"));
-    conf->fixedpath = fromcstr_(getenv("PKG_CONFIG_LIBDIR"));
+    conf->envpath = s8fromcstr(getenv("PKG_CONFIG_PATH"));
+    conf->fixedpath = s8fromcstr(getenv("PKG_CONFIG_LIBDIR"));
     if (!conf->fixedpath.s) {
         conf->fixedpath = S(pkg_config_path);
     }
-    conf->sys_incpath = fromcstr_(getenv("PKG_CONFIG_SYSTEM_INCLUDE_PATH"));
+    conf->sys_incpath = s8fromcstr(getenv("PKG_CONFIG_SYSTEM_INCLUDE_PATH"));
     if (!conf->sys_incpath.s) {
         conf->sys_incpath = S(PKG_CONFIG_SYSTEM_INCLUDE_PATH);
     }
-    conf->sys_libpath = fromcstr_(getenv("PKG_CONFIG_SYSTEM_LIBRARY_PATH"));
+    conf->sys_libpath = s8fromcstr(getenv("PKG_CONFIG_SYSTEM_LIBRARY_PATH"));
     if (!conf->sys_libpath.s) {
         conf->sys_libpath = S(PKG_CONFIG_SYSTEM_LIBRARY_PATH);
     }
-    conf->top_builddir = fromcstr_(getenv("PKG_CONFIG_TOP_BUILD_DIR"));
-    conf->print_sysinc = fromcstr_(getenv("PKG_CONFIG_ALLOW_SYSTEM_CFLAGS"));
-    conf->print_syslib = fromcstr_(getenv("PKG_CONFIG_ALLOW_SYSTEM_LIBS"));
+    conf->top_builddir = s8fromcstr(getenv("PKG_CONFIG_TOP_BUILD_DIR"));
+    conf->print_sysinc = s8fromcstr(getenv("PKG_CONFIG_ALLOW_SYSTEM_CFLAGS"));
+    conf->print_syslib = s8fromcstr(getenv("PKG_CONFIG_ALLOW_SYSTEM_LIBS"));
 
     uconfig(conf);
 

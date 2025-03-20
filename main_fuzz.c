@@ -39,7 +39,9 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
 int main(void)
 {
     __AFL_INIT();
-    s8 args[] = {S("--static"), S("--cflags"), S("--libs"), S("afl")};
+    u8 *args[] = {
+        S("--static").s, S("--cflags").s, S("--libs").s, S("afl").s,
+    };
 
     iz cap = 1<<16;
     arena perm = {0};

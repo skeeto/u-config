@@ -152,10 +152,10 @@ static void run(config conf, ...)
     }
     va_end(ap);
 
-    conf.args = new(&conf.perm, s8, conf.nargs);
+    conf.args = new(&conf.perm, u8 *, conf.nargs);
     va_start(ap, conf);
     for (iz i = 0; i < conf.nargs; i++) {
-        conf.args[i] = va_arg(ap, s8);
+        conf.args[i] = va_arg(ap, s8).s;
     }
     va_end(ap);
 
@@ -847,6 +847,7 @@ static void test_manyvars(arena a)
         u8buf mem = newmembuf(&temp.perm);
         printu8(&mem, prefix);
         printi32_(&mem, i);
+        printu8(&mem, 0);
         s8 var = finalize(&mem);
         SHOULDPASS {
             run(temp, S("manyvars.pc"), S("--variable"), var, E);

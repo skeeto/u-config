@@ -83,16 +83,6 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
     return r;
 }
 
-static s8 fromcstr_(u8 *z)
-{
-    s8 s = {0};
-    s.s = (u8 *)z;
-    if (s.s) {
-        for (; s.s[s.len]; s.len++) {}
-    }
-    return s;
-}
-
 static arena getarena_(void)
 {
     static byte heap[1<<22];
@@ -119,10 +109,7 @@ static i32 os_main(i32 argc, u8 **argv, u8 **envp)
         argv++;
     }
     conf->nargs = argc;
-    conf->args = new(&conf->perm, s8, argc);
-    for (i32 i = 0; i < argc; i++) {
-        conf->args[i] = fromcstr_(argv[i]);
-    }
+    conf->args = argv;
 
     conf->pc_path = S(PKG_CONFIG_LIBDIR);
     conf->pc_sysincpath = S(PKG_CONFIG_SYSTEM_INCLUDE_PATH);
@@ -132,7 +119,7 @@ static i32 os_main(i32 argc, u8 **argv, u8 **envp)
     conf->sys_libpath = S(PKG_CONFIG_SYSTEM_LIBRARY_PATH);
 
     for (u8 **v = envp; *v; v++) {
-        cut c = s8cut(fromcstr_(*v), '=');
+        cut c = s8cut(s8fromcstr(*v), '=');
         s8 name = c.head;
         s8 value = c.tail;
 
