@@ -16,46 +16,47 @@
 
 #define E S("")
 #define SHOULDPASS \
-    for (i32 r = setjmp(context.exit); \
+    for (i32 r = setjmp(conf.perm.ctx->exit); \
          !r || (r>0 && (__builtin_trap(), 0)); \
          r = -1)
 #define SHOULDFAIL \
-    for (i32 r = setjmp(context.exit); !r; __builtin_trap())
+    for (i32 r = setjmp(conf.perm.ctx->exit); !r; __builtin_trap())
 #define PCHDR "Name:\n" "Version:\n" "Description:\n"
 #define EXPECT(w) \
-    if (!s8equals(context.output, S(w))) { \
+    if (!s8equals(conf.perm.ctx->output, S(w))) { \
         printf("EXPECT: %s", w); \
-        printf("OUTPUT: %.*s", (int)context.output.len, context.output.s); \
+        printf("OUTPUT: %.*s", \
+               (int)conf.perm.ctx->output.len, conf.perm.ctx->output.s); \
         fflush(stdout); \
         __builtin_trap(); \
     }
 #define MATCH(w) \
-    if (s8find_(context.output, S(w)) == context.output.len) { \
+    if (s8find_(conf.perm.ctx->output, S(w)) == conf.perm.ctx->output.len) { \
         printf("MATCH:  %s\n", w); \
-        printf("OUTPUT: %.*s", (int)context.output.len, context.output.s); \
+        printf("OUTPUT: %.*s", \
+               (int)conf.perm.ctx->output.len, conf.perm.ctx->output.s); \
         fflush(stdout); \
         __builtin_trap(); \
     }
 
-static struct {
+struct os {
     jmp_buf exit;
     arena   perm;
-    arena   reset;
     s8      outbuf;
     s8      output;
     s8      outavail;
     env    *filesystem;
     b32     active;
-} context;
+};
 
-static void os_fail(void)
+static void os_fail(os *ctx)
 {
-    assert(context.active);
-    context.active = 0;
-    longjmp(context.exit, 1);
+    assert(ctx->active);
+    ctx->active = 0;
+    longjmp(ctx->exit, 1);
 }
 
-static filemap os_mapfile(arena *perm, s8 path)
+static filemap os_mapfile(os *ctx, arena *perm, s8 path)
 {
     (void)perm;
     assert(path.s);
@@ -65,7 +66,7 @@ static filemap os_mapfile(arena *perm, s8 path)
 
     filemap r = {0};
 
-    s8 *data = insert(&context.filesystem, path, 0);
+    s8 *data = insert(&ctx->filesystem, path, 0);
     if (!data) {
         r.status = filemap_NOTFOUND;
         return r;
@@ -75,12 +76,12 @@ static filemap os_mapfile(arena *perm, s8 path)
     return r;
 }
 
-static void os_write(i32 fd, s8 s)
+static void os_write(os *ctx, i32 fd, s8 s)
 {
     assert(fd==1 || fd==2);
-    assert(context.outavail.len >= s.len);
-    context.outavail = s8copy(context.outavail, s);
-    context.output.len += s.len;
+    assert(ctx->outavail.len >= s.len);
+    ctx->outavail = s8copy(ctx->outavail, s);
+    ctx->output.len += s.len;
 }
 
 // Return needle offset, or the length of haystack on no match.
@@ -115,26 +116,27 @@ static iz s8find_(s8 haystack, s8 needle)
     return haystack.len;
 }
 
-static config newtest_(s8 name)
+static config newtest_(arena a, s8 name)
 {
     printf("TEST: %.*s\n", (int)name.len, (char *)name.s);
 
-    context.filesystem = 0;
-    context.perm = context.reset;
-    context.outbuf = news8(&context.perm, 1<<10);
+    os *ctx = new(&a, os, 1);
+    ctx->outbuf = news8(&a, 1<<10);
 
     config conf = {0};
-    conf.perm = context.perm;
     conf.delim = ':';
     conf.sys_incpath = S("/usr/include");
     conf.sys_libpath = S("/lib:/usr/lib");
     conf.fixedpath = S("/usr/lib/pkgconfig:/usr/share/pkgconfig");
+    conf.perm = a;
+    conf.perm.ctx = ctx;
     return conf;
 }
 
 static void newfile_(config *conf, s8 path, s8 contents)
 {
-    *insert(&context.filesystem, path, &conf->perm) = contents;
+    os *ctx = conf->perm.ctx;
+    *insert(&ctx->filesystem, path, &conf->perm) = contents;
 }
 
 static void run(config conf, ...)
@@ -157,27 +159,28 @@ static void run(config conf, ...)
     }
     va_end(ap);
 
-    context.output = takehead(context.outbuf, 0);
-    context.outavail = context.outbuf;
+    os *ctx = conf.perm.ctx;
+    ctx->output = takehead(ctx->outbuf, 0);
+    ctx->outavail = ctx->outbuf;
     fillbytes(conf.perm.beg, 0x55, conf.perm.end-conf.perm.beg);
-    context.active = 1;
+    ctx->active = 1;
     uconfig(&conf);
-    assert(context.active);
-    context.active = 0;
+    assert(ctx->active);
+    ctx->active = 0;
 }
 
-static void test_noargs(void)
+static void test_noargs(arena a)
 {
     // NOTE: this is mainly a sanity check of the test system itself
-    config conf = newtest_(S("no arguments"));
+    config conf = newtest_(a, S("no arguments"));
     SHOULDFAIL {
         run(conf, E);
     }
 }
 
-static void test_dashdash(void)
+static void test_dashdash(arena a)
 {
-    config conf = newtest_(S("handle -- argument"));
+    config conf = newtest_(a, S("handle -- argument"));
     newfile_(&conf, S("/usr/lib/pkgconfig/--foo.pc"), S(
         PCHDR
         "Cflags: -Dfoo\n"
@@ -192,9 +195,9 @@ static void test_dashdash(void)
     EXPECT("-Dfoo -Ddashdash\n");
 }
 
-static void test_modversion(void)
+static void test_modversion(arena a)
 {
-    config conf = newtest_(S("--modversion"));
+    config conf = newtest_(a, S("--modversion"));
     newfile_(&conf, S("/usr/lib/pkgconfig/direct.pc"), S(
         "Name:\n"
         "Version: 1.2.3\n"
@@ -231,9 +234,9 @@ static void test_modversion(void)
     }
 }
 
-static void test_versioncheck(void)
+static void test_versioncheck(arena a)
 {
-    config conf = newtest_(S("version checks"));
+    config conf = newtest_(a, S("version checks"));
     newfile_(&conf, S("/usr/lib/pkgconfig/test.pc"), S(
         "Name:\n"
         "Version: 1.2.3\n"
@@ -274,11 +277,11 @@ static void test_versioncheck(void)
     }
 }
 
-static void test_versionorder(void)
+static void test_versionorder(arena a)
 {
     // Scenario: liba depends on libc and libb
     // Expect: modversion order is unaffected
-    config conf = newtest_(S("library version ordering"));
+    config conf = newtest_(a, S("library version ordering"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         "Name: \n"
         "Description: \n"
@@ -301,9 +304,9 @@ static void test_versionorder(void)
     EXPECT("1\n2\n3\n");
 }
 
-static void test_overrides(void)
+static void test_overrides(arena a)
 {
-    config conf = newtest_(S("--{atleast,exact,max}-version"));
+    config conf = newtest_(a, S("--{atleast,exact,max}-version"));
     newfile_(&conf, S("/usr/lib/pkgconfig/t.pc"), S(
         "Name:\n"
         "Version: 1\n"
@@ -341,9 +344,9 @@ static void test_overrides(void)
     }
 }
 
-static void test_maximum_traverse_depth(void)
+static void test_maximum_traverse_depth(arena a)
 {
-    config conf = newtest_(S("--maximum-traverse-depth"));
+    config conf = newtest_(a, S("--maximum-traverse-depth"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
         "Requires: b\n"
@@ -375,11 +378,11 @@ static void test_maximum_traverse_depth(void)
     EXPECT("-Da -Db -Dc\n");
 }
 
-static void test_private_cflags(void)
+static void test_private_cflags(arena a)
 {
     // Scenario: a has private cflags
     // Expect: --cflags should not output it unless --static is also given
-    config conf = newtest_(S("private cflags"));
+    config conf = newtest_(a, S("private cflags"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
         "Cflags: -DA_PUB\n"
@@ -435,11 +438,11 @@ static void test_private_cflags(void)
     EXPECT("-DB_PUB -DB_PRIV -DC_PUB -DC_PRIV -DD_PUB -DD_PRIV\n");
 }
 
-static void test_private_transitive(void)
+static void test_private_transitive(arena a)
 {
     // Scenario: a privately requires b which publicly requires c
     // Expect: --libs should not include c without --static
-    config conf = newtest_(S("private transitive"));
+    config conf = newtest_(a, S("private transitive"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
         "Requires: x\n"
@@ -472,7 +475,7 @@ static void test_private_transitive(void)
     EXPECT("-la -lx -lb -lc\n");
 }
 
-static void test_revealed_transitive(void)
+static void test_revealed_transitive(arena a)
 {
     // Scenario: a privately requires b, which requires x
     // Expect: "--libs a" lists only a, "--libs a b" reveals x
@@ -480,7 +483,7 @@ static void test_revealed_transitive(void)
     // The trouble is that x is initially loaded private. However, when
     // loading b it should become public, and so must be revisited in
     // traversal and marked as such.
-    config conf = newtest_(S("revealed transitive"));
+    config conf = newtest_(a, S("revealed transitive"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
         "Requires.private: b\n"
@@ -506,9 +509,9 @@ static void test_revealed_transitive(void)
     EXPECT("-la -lx\n");
 }
 
-static void test_syspaths(void)
+static void test_syspaths(arena a)
 {
-    config conf = newtest_(S("exclude syspaths"));
+    config conf = newtest_(a, S("exclude syspaths"));
     newfile_(&conf, S("/usr/lib/pkgconfig/example.pc"), S(
         PCHDR
         "prefix=/usr\n"
@@ -543,12 +546,12 @@ static void test_syspaths(void)
     EXPECT("-DEXAMPLE -L/usr/lib -lexample\n");
 }
 
-static void test_libsorder(void)
+static void test_libsorder(arena a)
 {
     // Scenario: two packages link a common library
     // Expect: the common library is listed after both, other flags
     //   maintain their first-seen position and de-duplicate the rest
-    config conf = newtest_(S("library ordering"));
+    config conf = newtest_(a, S("library ordering"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
         "Cflags: -DA -DGL\n"
@@ -565,11 +568,11 @@ static void test_libsorder(void)
     EXPECT("-DA -DGL -DB -L/opt/lib -pthread -mwindows -la -lb -lopengl32\n");
 }
 
-static void test_staticorder(void)
+static void test_staticorder(arena a)
 {
     // Scenario: liba depends on libc and libb, libb depends on libc
     // Expect: libc is listed last
-    config conf = newtest_(S("static library ordering"));
+    config conf = newtest_(a, S("static library ordering"));
     newfile_(&conf, S("/usr/lib/pkgconfig/a.pc"), S(
         PCHDR
         "Requires.private: c b\n"
@@ -590,13 +593,13 @@ static void test_staticorder(void)
     EXPECT("-la -lb -lc\n");
 }
 
-static void test_windows(void)
+static void test_windows(arena a)
 {
     // Tests the ';' delimiter, that the prefix is overridden, and that
     // prefixes containing spaces are properly quoted. The fixed path
     // would be Win32 platform's fixed path if the binary was located in
     // "$HOME/bin".
-    config conf = newtest_(S("windows"));
+    config conf = newtest_(a, S("windows"));
     conf.fixedpath = S(
         "C:/Documents and Settings/John Falstaff/lib/pkgconfig;"
         "C:/Documents and Settings/John Falstaff/share/pkgconfig"
@@ -656,11 +659,11 @@ static void test_windows(void)
     );
 }
 
-static void test_parens(void)
+static void test_parens(arena a)
 {
     // Test if that paths allow parenthesis, but also that parenthesis
     // otherwise still work as meta characters.
-    config conf = newtest_(S("parens"));
+    config conf = newtest_(a, S("parens"));
     conf.fixedpath = S(
         "C:/Program Files (x86)/Contoso/lib/pkgconfig"
     );
@@ -693,10 +696,10 @@ static void test_parens(void)
     );
 }
 
-static void test_error_messages(void)
+static void test_error_messages(arena a)
 {
     // Check that error messages mention important information
-    config conf = newtest_(S("error messages"));
+    config conf = newtest_(a, S("error messages"));
     newfile_(&conf, S("/usr/lib/pkgconfig/badpkg.pc"), S(
         PCHDR
         "Requires: < 1\n"
@@ -815,10 +818,10 @@ static void printi32_(u8buf *out, i32 x)
     prints8(out, s8span(p, e));
 }
 
-static void test_manyvars(void)
+static void test_manyvars(arena a)
 {
     // Stresses the hash-trie-backed package environment
-    config conf = newtest_(S("many variables"));
+    config conf = newtest_(a, S("many variables"));
     newfile_(&conf, S("manyvars.pc"), S(""));  // allocate empty file
     i32 nvars = 10000;
 
@@ -853,9 +856,9 @@ static void test_manyvars(void)
     }
 }
 
-static void test_lol(void)
+static void test_lol(arena a)
 {
-    config conf = newtest_(S("a billion laughs"));
+    config conf = newtest_(a, S("a billion laughs"));
     newfile_(&conf, S("lol.pc"), S(
         "v9=lol\n"
         "v8=${v9}${v9}${v9}${v9}${v9}${v9}${v9}${v9}${v9}${v9}\n"
@@ -890,26 +893,26 @@ static arena newarena_(iz cap)
 
 int main(void)
 {
-    context.perm = context.reset = newarena_(1<<21);
+    arena a = newarena_(1<<21);
 
-    test_noargs();
-    test_dashdash();
-    test_modversion();
-    test_versioncheck();
-    test_versionorder();
-    test_overrides();
-    test_maximum_traverse_depth();
-    test_private_cflags();
-    test_private_transitive();
-    test_revealed_transitive();
-    test_syspaths();
-    test_libsorder();
-    test_staticorder();
-    test_windows();
-    test_parens();
-    test_error_messages();
-    test_manyvars();
-    test_lol();
+    test_noargs(a);
+    test_dashdash(a);
+    test_modversion(a);
+    test_versioncheck(a);
+    test_versionorder(a);
+    test_overrides(a);
+    test_maximum_traverse_depth(a);
+    test_private_cflags(a);
+    test_private_transitive(a);
+    test_revealed_transitive(a);
+    test_syspaths(a);
+    test_libsorder(a);
+    test_staticorder(a);
+    test_windows(a);
+    test_parens(a);
+    test_error_messages(a);
+    test_manyvars(a);
+    test_lol(a);
 
     puts("all tests pass");
     return 0;

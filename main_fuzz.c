@@ -9,26 +9,29 @@
 
 __AFL_FUZZ_INIT();
 
-static jmp_buf ret;
-static s8 pcfile;
+struct os {
+    jmp_buf ret;
+    s8      pcfile;
+};
 
-static void os_fail(void)
+static void os_fail(os *ctx)
 {
-    longjmp(ret, 1);
+    longjmp(ctx->ret, 1);
 }
 
-static void os_write(int fd, s8 s)
+static void os_write(os *ctx, i32 fd, s8 s)
 {
+    (void)ctx;
     (void)fd;
     (void)s;
 }
 
-static filemap os_mapfile(arena *perm, s8 path)
+static filemap os_mapfile(os *ctx, arena *perm, s8 path)
 {
     (void)perm;
     (void)path;
     filemap r = {0};
-    r.data = pcfile;
+    r.data = ctx->pcfile;
     r.status = filemap_OK;
     return r;
 }
@@ -43,15 +46,17 @@ int main(void)
     perm.beg = malloc(cap);
     perm.end = perm.beg + cap;
 
-    pcfile.s = __AFL_FUZZ_TESTCASE_BUF;
+    os ctx = {0};
+    ctx.pcfile.s = __AFL_FUZZ_TESTCASE_BUF;
     while (__AFL_LOOP(10000)) {
-        pcfile.len = __AFL_FUZZ_TESTCASE_LEN;
+        ctx.pcfile.len = __AFL_FUZZ_TESTCASE_LEN;
         config conf = {0};
         conf.perm = perm;
+        conf.perm.ctx = &ctx;
         conf.args = args;
         conf.nargs = countof(args);
         conf.fixedpath = S("/usr/lib/pkgconfig");
-        if (!setjmp(ret)) {
+        if (!setjmp(ctx.ret)) {
             uconfig(&conf);
         }
     }

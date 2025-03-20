@@ -10,11 +10,13 @@
 #endif
 
 // For communication with os_write()
-static struct {
-    i32 handle;
-    b32 isconsole;
-    b32 err;
-} handles[3];
+struct os {
+    struct {
+        i32 h;
+        b32 isconsole;
+        b32 err;
+    } handles[3];
+};
 
 typedef struct {
     c16 *s;
@@ -225,7 +227,7 @@ static s8 fromenv_(arena *perm, c16 *name)
     // Store temporarily at the beginning of the arena.
     iz cap = (perm->end - perm->beg) / (iz)sizeof(c16);
     if (wlen > cap) {
-        oom();
+        oom(perm->ctx);
     }
     s16 wvar = {0};
     wvar.s   = (c16 *)perm->beg;
@@ -310,9 +312,10 @@ static s8 fromcstr_(u8 *z)
     return s;
 }
 
-static config *newconfig_(void)
+static config *newconfig_(os *ctx)
 {
     arena perm = newarena_(1<<22);
+    perm.ctx = ctx;
     config *conf = new(&perm, config, 1);
     conf->perm = perm;
     return conf;
@@ -321,16 +324,17 @@ static config *newconfig_(void)
 __attribute((force_align_arg_pointer))
 void mainCRTStartup(void)
 {
-    config *conf = newconfig_();
+    os ctx[1] = {0};
+    i32 dummy;
+    ctx->handles[1].h         = GetStdHandle(STD_OUTPUT_HANDLE);
+    ctx->handles[1].isconsole = GetConsoleMode(ctx->handles[1].h, &dummy);
+    ctx->handles[2].h         = GetStdHandle(STD_ERROR_HANDLE);
+    ctx->handles[2].isconsole = GetConsoleMode(ctx->handles[2].h, &dummy);
+
+    config *conf = newconfig_(ctx);
     conf->delim = ';';
     conf->define_prefix = 1;
     arena *perm = &conf->perm;
-
-    i32 dummy;
-    handles[1].handle = GetStdHandle(STD_OUTPUT_HANDLE);
-    handles[1].isconsole = GetConsoleMode(handles[1].handle, &dummy);
-    handles[2].handle = GetStdHandle(STD_ERROR_HANDLE);
-    handles[2].isconsole = GetConsoleMode(handles[2].handle, &dummy);
 
     u8 **argv = new(perm, u8 *, CMDLINE_ARGV_MAX);
     c16 *cmdline = GetCommandLineW();
@@ -363,12 +367,13 @@ void mainCRTStartup(void)
     normalize_(conf->top_builddir);
 
     uconfig(conf);
-    ExitProcess(handles[1].err || handles[2].err);
+    ExitProcess(ctx->handles[1].err || ctx->handles[2].err);
     assert(0);
 }
 
-static filemap os_mapfile(arena *perm, s8 path)
+static filemap os_mapfile(os *ctx, arena *perm, s8 path)
 {
+    assert(ctx);
     assert(path.len > 0);
     assert(!path.s[path.len-1]);
 
@@ -416,8 +421,9 @@ static filemap os_mapfile(arena *perm, s8 path)
     return r;
 }
 
-static void os_fail(void)
+static void os_fail(os *ctx)
 {
+    assert(ctx);
     ExitProcess(1);
     assert(0);
 }
@@ -446,18 +452,18 @@ static void printc32_(u16buf *b, c32 rune)
     b->len += utf16encode_(b->buf+b->len, rune);
 }
 
-static void os_write(i32 fd, s8 s)
+static void os_write(os *ctx, i32 fd, s8 s)
 {
     assert((i32)s.len == s.len);  // NOTE: assume it's not a huge buffer
     assert(fd==1 || fd==2);
 
-    b32 *err = &handles[fd].err;
+    b32 *err = &ctx->handles[fd].err;
     if (*err) {
         return;
     }
 
-    i32 handle = handles[fd].handle;
-    if (handles[fd].isconsole) {
+    i32 handle = ctx->handles[fd].h;
+    if (ctx->handles[fd].isconsole) {
         // NOTE: There is a small chance that a multi-byte code point
         // spans flushes from the application. With no decoder state
         // tracked between os_write calls, this will mistranslate for

@@ -17,6 +17,8 @@ typedef          char    byte;
 #define s8(s)         {(u8 *)s, countof(s)-1}
 #define S(s)          (s8)s8(s)
 
+typedef struct os os;
+
 typedef struct {
     u8 *s;
     iz  len;
@@ -25,6 +27,7 @@ typedef struct {
 typedef struct {
     byte *beg;
     byte *end;
+    os   *ctx;
 } arena;
 
 typedef struct {
@@ -62,22 +65,22 @@ typedef struct {
 
 // Load a file into memory, maybe using the arena. The path must include
 // a null terminator since it may be passed directly to the OS interface.
-static filemap os_mapfile(arena *, s8 path);
+static filemap os_mapfile(os *, arena *, s8 path);
 
 // Write buffer to stdout (1) or stderr (2). The platform must detect
 // write errors and arrange for an eventual non-zero exit status.
-static void os_write(i32 fd, s8);
+static void os_write(os *, i32 fd, s8);
 
 // Immediately exit the program with a non-zero status.
-static void os_fail(void) __attribute((noreturn));
+static void os_fail(os *) __attribute((noreturn));
 
 
 // Application
 
-static void oom(void)
+static void oom(os *ctx)
 {
-    os_write(2, S("pkg-config: out of memory\n"));
-    os_fail();
+    os_write(ctx, 2, S("pkg-config: out of memory\n"));
+    os_fail(ctx);
 }
 
 static b32 digit(u8 c)
@@ -132,7 +135,7 @@ static byte *alloc(arena *a, iz size, iz count)
     iz alignment = -((u32)size * (u32)count) & 7;
     iz available = a->end - a->beg - alignment;
     if (count > available/size) {
-        oom();
+        oom(a->ctx);
     }
     iz total = size * count;
     return fillbytes(a->end -= total + alignment, 0, total);
@@ -332,6 +335,7 @@ typedef struct {
     iz     cap;
     iz     len;
     arena *perm;
+    os    *ctx;
     i32    fd;
 } u8buf;
 
@@ -342,13 +346,15 @@ static u8buf *newfdbuf(arena *perm, i32 fd, iz cap)
     b->cap = cap;
     b->buf = new(perm, u8, cap);
     b->fd  = fd;
+    b->ctx = perm->ctx;
     return b;
 }
 
 static u8buf *newnullout(arena *perm)
 {
     u8buf *b = new(perm, u8buf, 1);
-    b->fd = -1;
+    b->fd  = -1;
+    b->ctx = perm->ctx;
     return b;
 }
 
@@ -360,6 +366,7 @@ static u8buf newmembuf(arena *perm)
     b.buf  = (u8 *)perm->beg;
     b.cap  = perm->end - perm->beg;
     b.perm = perm;
+    b.ctx  = perm->ctx;
     return b;
 }
 
@@ -383,10 +390,10 @@ static void flush(u8buf *b)
 {
     switch (b->fd) {
     case -1: break;  // /dev/null
-    case  0: oom();
+    case  0: oom(b->ctx);
              break;
     default: if (b->len) {
-                 os_write(b->fd, gets8(b));
+                 os_write(b->ctx, b->fd, gets8(b));
              }
     }
     b->len = 0;
@@ -703,7 +710,7 @@ static void checknotop(u8buf *err, s8 tok, pkg *p)
         }
         prints8(err, S("\n"));
         flush(err);
-        os_fail();
+        os_fail(err->ctx);
     }
 }
 
@@ -719,7 +726,7 @@ static void opfail(u8buf *err, versop op, pkg *p)
     }
     prints8(err, S("\n"));
     flush(err);
-    os_fail();
+    os_fail(err->ctx);
 }
 
 static pkgspec *parsespecs(s8 *args, iz nargs, pkg *p, u8buf *err, arena *a)
@@ -873,7 +880,7 @@ static void missing(u8buf *err, s8 option)
     prints8(err, option);
     prints8(err, S("\n"));
     flush(err);
-    os_fail();
+    os_fail(err->ctx);
 }
 
 typedef struct {
@@ -1066,7 +1073,7 @@ static s8 readpackage(u8buf *err, s8 path, s8 realname, arena *perm)
     }
 
     s8 null = {0};
-    filemap m = os_mapfile(perm, path);
+    filemap m = os_mapfile(perm->ctx, perm, path);
     switch (m.status) {
     case filemap_NOTFOUND:
         return null;
@@ -1079,7 +1086,7 @@ static s8 readpackage(u8buf *err, s8 path, s8 realname, arena *perm)
         prints8(err, path);
         prints8(err, S("'\n"));
         flush(err);
-        os_fail();
+        os_fail(err->ctx);
 
     case filemap_OK:
         return m.data;
@@ -1103,7 +1110,7 @@ static void expand(u8buf *out, u8buf *err, env *global, pkg *p, s8 str)
                     prints8(err, p->path);
                     prints8(err, S("'\n"));
                     flush(err);
-                    os_fail();
+                    os_fail(err->ctx);
                 }
 
                 prints8(out, takehead(s, i));
@@ -1130,7 +1137,7 @@ static void expand(u8buf *out, u8buf *err, env *global, pkg *p, s8 str)
                     prints8(err, p->path);
                     prints8(err, S("'\n"));
                     flush(err);
-                    os_fail();
+                    os_fail(err->ctx);
                 }
                 stack[++top] = value;
                 s.len = 0;
@@ -1197,7 +1204,7 @@ static pkg findpackage(search *dirs, u8buf *err, s8 realname, arena *perm)
         prints8(err, realname);
         prints8(err, S("'\n"));
         flush(err);
-        os_fail();
+        os_fail(err->ctx);
     }
 
     parseresult r = parsepackage(contents, perm);
@@ -1210,7 +1217,7 @@ static pkg findpackage(search *dirs, u8buf *err, s8 realname, arena *perm)
         prints8(err, path);
         prints8(err, S("'\n"));
         flush(err);
-        os_fail();
+        os_fail(err->ctx);
 
     case parse_DUPFIELD:
         prints8(err, S("pkg-config: "));
@@ -1220,7 +1227,7 @@ static pkg findpackage(search *dirs, u8buf *err, s8 realname, arena *perm)
         prints8(err, path);
         prints8(err, S("'\n"));
         flush(err);
-        os_fail();
+        os_fail(err->ctx);
 
     case parse_OK:
         break;
@@ -1248,7 +1255,7 @@ static pkg findpackage(search *dirs, u8buf *err, s8 realname, arena *perm)
         flush(err);
         #ifndef FUZZTEST
         // Do not enforce during fuzzing
-        os_fail();
+        os_fail(err->ctx);
         #endif
     }
 
@@ -1444,7 +1451,7 @@ static void failmaxrecurse(u8buf *err, s8 tok)
     prints8(err, tok);
     prints8(err, S("'\n"));
     flush(err);
-    os_fail();
+    os_fail(err->ctx);
 }
 
 static void failversion(u8buf *err, pkg *pkg, versop op, s8 want)
@@ -1460,7 +1467,7 @@ static void failversion(u8buf *err, pkg *pkg, versop op, s8 want)
     prints8(err, pkg->version);
     prints8(err, S("'\n"));
     flush(err);
-    os_fail();
+    os_fail(err->ctx);
 }
 
 static pkgs process(processor *proc, pkgspec *specs, arena *perm)
@@ -1743,7 +1750,7 @@ static void appendfield(u8buf *err, fieldwriter *w, pkg *p, s8 field)
             prints8(err, p->realname);
             prints8(err, S("'\n"));
             flush(err);
-            os_fail();
+            os_fail(err->ctx);
         }
         if (filterok(f, r.arg)) {
             appendarg(&w->args, r.arg, perm);
@@ -1922,7 +1929,7 @@ static void uconfig(config *conf)
                 prints8(err, r.value);
                 prints8(err, S("'\n"));
                 flush(err);
-                os_fail();
+                os_fail(err->ctx);
             }
             *insert(&global, c.head, perm) = c.tail;
 
@@ -2000,7 +2007,7 @@ static void uconfig(config *conf)
             prints8(err, r.arg);
             prints8(err, S("\n"));
             flush(err);
-            os_fail();
+            os_fail(err->ctx);
         }
     }
 
@@ -2019,7 +2026,7 @@ static void uconfig(config *conf)
         prints8(err, S("pkg-config: "));
         prints8(err, S("requires at least one package name\n"));
         flush(err);
-        os_fail();
+        os_fail(err->ctx);
     }
 
     // --{atleast,exact,max}-version

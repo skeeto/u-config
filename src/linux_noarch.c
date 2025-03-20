@@ -25,26 +25,29 @@ static long syscall1(long, long);
 static long syscall2(long, long, long);
 static long syscall3(long, long, long, long);
 
-static void os_fail(void)
+static void os_fail(os *ctx)
 {
+    (void)ctx;
     syscall1(SYS_exit, 1);
     __builtin_unreachable();
 }
 
-static void os_write(i32 fd, s8 s)
+static void os_write(os *ctx, i32 fd, s8 s)
 {
+    (void)ctx;
     assert(fd==1 || fd==2);
     while (s.len) {
         long r = syscall3(SYS_write, fd, (long)s.s, s.len);
         if (r < 0) {
-            os_fail();
+            os_fail(0);
         }
         s = cuthead(s, (iz)r);
     }
 }
 
-static filemap os_mapfile(arena *perm, s8 path)
+static filemap os_mapfile(os *ctx, arena *perm, s8 path)
 {
+    (void)ctx;
     assert(path.s);
     assert(path.len);
     assert(!path.s[path.len-1]);
@@ -95,7 +98,7 @@ static arena getarena_(void)
     static byte heap[1<<22];
     byte *mem = heap;
     asm ("" : "+r"(mem));  // launder
-    return (arena){mem, mem+countof(heap)};
+    return (arena){mem, mem+countof(heap), 0};
 }
 
 static config *newconfig_(void)

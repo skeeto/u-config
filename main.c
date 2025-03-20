@@ -119,8 +119,9 @@ int main(int argc, char **argv)
     return ferror(stdout);
 }
 
-static filemap os_mapfile(arena *perm, s8 path)
+static filemap os_mapfile(os *ctx, arena *perm, s8 path)
 {
+    (void)ctx;
     assert(path.len > 0);
     assert(!path.s[path.len-1]);
 
@@ -148,15 +149,17 @@ static filemap os_mapfile(arena *perm, s8 path)
     return r;
 }
 
-static void os_write(int fd, s8 s)
+static void os_write(os *ctx, i32 fd, s8 s)
 {
+    (void)ctx;
     assert(fd==1 || fd==2);
     FILE *f = fd==1 ? stdout : stderr;
     fwrite(s.s, s.len, 1, f);
     fflush(f);
 }
 
-static void os_fail(void)
+static void os_fail(os *ctx)
 {
+    (void)ctx;
     exit(1);
 }
