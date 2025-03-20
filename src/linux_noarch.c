@@ -39,7 +39,7 @@ static void os_write(i32 fd, s8 s)
         if (r < 0) {
             os_fail();
         }
-        s = cuthead(s, (size)r);
+        s = cuthead(s, (iz)r);
     }
 }
 
@@ -58,7 +58,7 @@ static filemap os_mapfile(arena *perm, s8 path)
     }
 
     r.data.s = (u8 *)perm->beg;
-    size cap = perm->end - perm->beg;
+    iz cap = perm->end - perm->beg;
     while (r.data.len < cap) {
         u8 *dst = r.data.s + r.data.len;
         long len = syscall3(SYS_read, fd, (long)dst, cap-r.data.len);

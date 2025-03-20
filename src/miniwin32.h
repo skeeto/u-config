@@ -36,6 +36,6 @@ W32(i32)    GetEnvironmentVariableW(c16 *, c16 *, i32);
 W32(i32)    GetModuleFileNameW(iptr, c16 *, i32);
 W32(i32)    GetStdHandle(i32);
 W32(b32)    ReadFile(iptr, u8 *, i32, i32 *, uptr);
-W32(byte *) VirtualAlloc(uptr, size, i32, i32);
+W32(byte *) VirtualAlloc(uptr, iz, i32, i32);
 W32(b32)    WriteConsoleW(iptr, c16 *, i32, i32 *, uptr);
 W32(b32)    WriteFile(iptr, u8 *, i32, i32 *, uptr);

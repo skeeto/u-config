@@ -59,7 +59,7 @@ static s8 fromcstr_(char *z)
 
 static arena newarena_(void)
 {
-    size cap = (size)1<<22;
+    iz cap = (iz)1<<22;
     arena a = {0};
     a.beg = malloc(cap);
     if (!a.beg) {
@@ -133,7 +133,7 @@ static filemap os_mapfile(arena *perm, s8 path)
     }
 
     r.data.s = (u8 *)perm->beg;
-    size available = perm->end - perm->beg;
+    iz available = perm->end - perm->beg;
     r.data.len = fread(r.data.s, 1, available, f);
     fclose(f);
 

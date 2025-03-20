@@ -18,10 +18,10 @@ static struct {
 
 typedef struct {
     c16 *s;
-    size len;
+    iz   len;
 } s16;
 
-static s16 s16cuthead_(s16 s, size off)
+static s16 s16cuthead_(s16 s, iz off)
 {
     assert(off >= 0);
     assert(off <= s.len);
@@ -30,7 +30,7 @@ static s16 s16cuthead_(s16 s, size off)
     return s;
 }
 
-static arena newarena_(size cap)
+static arena newarena_(iz cap)
 {
     arena arena = {0};
     arena.beg = VirtualAlloc(0, cap, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
@@ -172,7 +172,7 @@ static i32 utf16encode_(c16 *dst, c32 rune)
 
 static s16 towide_(arena *perm, s8 s)
 {
-    size len = 0;
+    iz len = 0;
     utf8 state = {0};
     state.tail = s;
     while (state.tail.len) {
@@ -193,7 +193,7 @@ static s16 towide_(arena *perm, s8 s)
 
 static s8 fromwide_(arena *perm, s16 w)
 {
-    size len = 0;
+    iz len = 0;
     utf16 state = {0};
     state.tail = w;
     while (state.tail.len) {
@@ -223,7 +223,7 @@ static s8 fromenv_(arena *perm, c16 *name)
     }
 
     // Store temporarily at the beginning of the arena.
-    size cap = (perm->end - perm->beg) / (size)sizeof(c16);
+    iz cap = (perm->end - perm->beg) / (iz)sizeof(c16);
     if (wlen > cap) {
         oom();
     }
@@ -243,7 +243,7 @@ static s8 fromenv_(arena *perm, c16 *name)
 // Normalize path to slashes as separators.
 static s8 normalize_(s8 path)
 {
-    for (size i = 0; i < path.len; i++) {
+    for (iz i = 0; i < path.len; i++) {
         if (path.s[i] == '\\') {
             path.s[i] = '/';
         }
@@ -251,7 +251,7 @@ static s8 normalize_(s8 path)
     return path;
 }
 
-static i32 truncsize(size len)
+static i32 truncsize(iz len)
 {
     i32 max = 0x7fffffff;
     return len>max ? max : (i32)len;
@@ -290,7 +290,7 @@ static s8 append2_(arena *perm, s8 pre, s8 suf)
 static s8 makepath_(arena *perm, s8 base, s8 lib, s8 share)
 {
     s8 delim = S(";");
-    size len = base.len + lib.len + delim.len + base.len + share.len;
+    iz len = base.len + lib.len + delim.len + base.len + share.len;
     s8 s = news8(perm, len);
     s8 r = s8copy(s, base);
        r = s8copy(r, lib);
@@ -336,7 +336,7 @@ void mainCRTStartup(void)
     c16 *cmdline = GetCommandLineW();
     conf->nargs = cmdline_to_argv8(cmdline, argv) - 1;
     conf->args = new(perm, s8, conf->nargs);
-    for (size i = 0; i < conf->nargs; i++) {
+    for (iz i = 0; i < conf->nargs; i++) {
         conf->args[i] = fromcstr_(argv[i+1]);
     }
 
@@ -394,7 +394,7 @@ static filemap os_mapfile(arena *perm, s8 path)
     }
 
     r.data.s = (u8 *)perm->beg;
-    size cap = perm->end - perm->beg;
+    iz cap = perm->end - perm->beg;
     while (r.data.len < cap) {
         i32 len = truncsize(cap - r.data.len);
         ReadFile(handle, r.data.s+r.data.len, len, &len, 0);

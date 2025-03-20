@@ -38,7 +38,7 @@ int main(void)
     __AFL_INIT();
     s8 args[] = {S("--static"), S("--cflags"), S("--libs"), S("afl")};
 
-    size cap = 1<<16;
+    iz cap = 1<<16;
     arena perm = {0};
     perm.beg = malloc(cap);
     perm.end = perm.beg + cap;

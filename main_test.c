@@ -84,28 +84,28 @@ static void os_write(i32 fd, s8 s)
 }
 
 // Return needle offset, or the length of haystack on no match.
-static size s8find_(s8 haystack, s8 needle)
+static iz s8find_(s8 haystack, s8 needle)
 {
     u32 match = 0;
-    for (size i = 0; i < needle.len; i++) {
+    for (iz i = 0; i < needle.len; i++) {
         match = match*257u + needle.s[i];
     }
 
     u32 f = 1;
     u32 x = 257;
-    for (size n = needle.len-1; n>0; n /= 2) {
+    for (iz n = needle.len-1; n>0; n /= 2) {
         f *= n&1 ? x : 1;
         x *= x;
     }
 
-    size i = 0;
+    iz i = 0;
     u32 hash = 0;
     for (; i<needle.len-1 && i<haystack.len; i++) {
         hash = hash*257u + haystack.s[i];
     }
     for (; i < haystack.len; i++) {
         hash = hash*257u + haystack.s[i];
-        size beg = i - needle.len + 1;
+        iz beg = i - needle.len + 1;
         s8 tail = cuthead(haystack, beg);
         if (hash==match && startswith(tail, needle)) {
             return beg;
@@ -152,7 +152,7 @@ static void run(config conf, ...)
 
     conf.args = new(&conf.perm, s8, conf.nargs);
     va_start(ap, conf);
-    for (size i = 0; i < conf.nargs; i++) {
+    for (iz i = 0; i < conf.nargs; i++) {
         conf.args[i] = va_arg(ap, s8);
     }
     va_end(ap);
@@ -877,7 +877,7 @@ static void test_lol(void)
     MATCH("out of memory");
 }
 
-static arena newarena_(size cap)
+static arena newarena_(iz cap)
 {
     arena arena = {0};
     arena.beg = malloc(cap);

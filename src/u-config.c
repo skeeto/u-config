@@ -8,18 +8,18 @@ typedef unsigned char    u8;
 typedef   signed int     b32;
 typedef   signed int     i32;
 typedef unsigned int     u32;
-typedef ptrdiff_t        size;
+typedef ptrdiff_t        iz;
 typedef          char    byte;
 
 #define assert(c)     while (!(c)) __builtin_unreachable()
-#define countof(a)    (size)(sizeof(a) / sizeof(*(a)))
+#define countof(a)    (iz)(sizeof(a) / sizeof(*(a)))
 #define new(a, t, n)  (t *)alloc(a, sizeof(t), n)
 #define s8(s)         {(u8 *)s, countof(s)-1}
 #define S(s)          (s8)s8(s)
 
 typedef struct {
-    u8  *s;
-    size len;
+    u8 *s;
+    iz  len;
 } s8;
 
 typedef struct {
@@ -30,7 +30,7 @@ typedef struct {
 typedef struct {
     arena perm;
     s8   *args;
-    size  nargs;
+    iz    nargs;
     s8    pc_path;       // default compile time fixedpath
     s8    pc_sysincpath; // default compile time system include path
     s8    pc_syslibpath; // default compile time system library path
@@ -94,7 +94,7 @@ static b32 whitespace(u8 c)
     return 0;
 }
 
-static byte *fillbytes(byte *dst, byte c, size len)
+static byte *fillbytes(byte *dst, byte c, iz len)
 {
     byte *r = dst;
     for (; len; len--) {
@@ -103,7 +103,7 @@ static byte *fillbytes(byte *dst, byte c, size len)
     return r;
 }
 
-static void u8copy(u8 *dst, u8 *src, size n)
+static void u8copy(u8 *dst, u8 *src, iz n)
 {
     assert(n >= 0);
     for (; n; n--) {
@@ -111,7 +111,7 @@ static void u8copy(u8 *dst, u8 *src, size n)
     }
 }
 
-static i32 u8compare(u8 *a, u8 *b, size n)
+static i32 u8compare(u8 *a, u8 *b, iz n)
 {
     for (; n; n--) {
         i32 d = *a++ - *b++;
@@ -125,20 +125,20 @@ static b32 pathsep(u8 c)
     return c=='/' || c=='\\';
 }
 
-static byte *alloc(arena *a, size objsize, size count)
+static byte *alloc(arena *a, iz size, iz count)
 {
-    assert(objsize > 0);
+    assert(size > 0);
     assert(count >= 0);
-    size alignment = -((u32)objsize * (u32)count) & 7;
-    size available = a->end - a->beg - alignment;
-    if (count > available/objsize) {
+    iz alignment = -((u32)size * (u32)count) & 7;
+    iz available = a->end - a->beg - alignment;
+    if (count > available/size) {
         oom();
     }
-    size total = objsize * count;
+    iz total = size * count;
     return fillbytes(a->end -= total + alignment, 0, total);
 }
 
-static s8 news8(arena *perm, size len)
+static s8 news8(arena *perm, iz len)
 {
     s8 r = {0};
     r.s = new(perm, u8, len);
@@ -172,7 +172,7 @@ static b32 s8equals(s8 a, s8 b)
     return a.len==b.len && !u8compare(a.s, b.s, a.len);
 }
 
-static s8 cuthead(s8 s, size off)
+static s8 cuthead(s8 s, iz off)
 {
     assert(off >= 0);
     assert(off <= s.len);
@@ -181,7 +181,7 @@ static s8 cuthead(s8 s, size off)
     return s;
 }
 
-static s8 takehead(s8 s, size len)
+static s8 takehead(s8 s, iz len)
 {
     assert(len >= 0);
     assert(len <= s.len);
@@ -189,7 +189,7 @@ static s8 takehead(s8 s, size len)
     return s;
 }
 
-static s8 cuttail(s8 s, size len)
+static s8 cuttail(s8 s, iz len)
 {
     assert(len >= 0);
     assert(len <= s.len);
@@ -197,7 +197,7 @@ static s8 cuttail(s8 s, size len)
     return s;
 }
 
-static s8 taketail(s8 s, size len)
+static s8 taketail(s8 s, iz len)
 {
     return cuthead(s, s.len-len);
 }
@@ -210,7 +210,7 @@ static b32 startswith(s8 s, s8 prefix)
 static u32 s8hash(s8 s)
 {
     u32 h = 0x811c9dc5;
-    for (size i = 0; i < s.len; i++) {
+    for (iz i = 0; i < s.len; i++) {
         h ^= s.s[i];
         h *= 0x01000193;
     }
@@ -224,7 +224,7 @@ typedef struct {
 
 static s8pair digits(s8 s)
 {
-    size len = 0;
+    iz len = 0;
     for (; len<s.len && digit(s.s[len]); len++) {}
     s8pair r = {0};
     r.head = takehead(s, len);
@@ -246,7 +246,7 @@ static s8 skiptokenspace(s8 s)
 static s8pair nexttoken(s8 s)
 {
     s = skiptokenspace(s);
-    size len = 0;
+    iz len = 0;
     for (; len<s.len && !tokenspace(s.s[len]); len++) {}
     s8pair r = {0};
     r.head = takehead(s, len);
@@ -263,7 +263,7 @@ typedef struct {
 static cut s8cut(s8 s, u8 delim)
 {
     cut r = {0};
-    size len = 0;
+    iz len = 0;
     for (; len < s.len; len++) {
         if (s.s[len] == delim) {
             break;
@@ -315,13 +315,13 @@ static u8 pathdecode(u8 c)
 static s8 s8pathencode(s8 s, arena *perm)
 {
     b32 encode = 0;
-    for (size i = 0; i<s.len && !encode; i++) {
+    for (iz i = 0; i<s.len && !encode; i++) {
         encode = pathencode(s.s[i]) != s.s[i];
     }
     if (!encode) return s;  // no encoding necessary
 
     s8 r = news8(perm, s.len);
-    for (size i = 0; i < s.len; i++) {
+    for (iz i = 0; i < s.len; i++) {
         r.s[i] = pathencode(s.s[i]);
     }
     return r;
@@ -329,14 +329,14 @@ static s8 s8pathencode(s8 s, arena *perm)
 
 typedef struct {
     u8    *buf;
-    size   cap;
-    size   len;
+    iz     cap;
+    iz     len;
     arena *perm;
     i32    fd;
 } u8buf;
 
 // Buffered output for os_write().
-static u8buf *newfdbuf(arena *perm, i32 fd, size cap)
+static u8buf *newfdbuf(arena *perm, i32 fd, iz cap)
 {
     u8buf *b = new(perm, u8buf, 1);
     b->cap = cap;
@@ -397,9 +397,9 @@ static void prints8(u8buf *b, s8 s)
     if (b->fd == -1) {
         return;  // /dev/null
     }
-    for (size off = 0; off < s.len;) {
-        size avail = b->cap - b->len;
-        size count = avail<s.len-off ? avail : s.len-off;
+    for (iz off = 0; off < s.len;) {
+        iz avail = b->cap - b->len;
+        iz count = avail<s.len-off ? avail : s.len-off;
         u8copy(b->buf+b->len, s.s+off, count);
         b->len += count;
         off += count;
@@ -455,14 +455,14 @@ static s8 lookup(env *global, env *env, s8 name)
 
 static s8 dirname(s8 path)
 {
-    size len = path.len;
+    iz len = path.len;
     while (len>0 && !pathsep(path.s[--len])) {}
     return takehead(path, len);
 }
 
 static s8 basename(s8 path)
 {
-    size len = path.len;
+    iz len = path.len;
     for (; len>0 && !pathsep(path.s[len-1]); len--) {}
     return taketail(path, path.len-len);
 }
@@ -471,7 +471,7 @@ static s8 buildpath(s8 dir, s8 pc, arena *perm)
 {
     s8 sep = S("/");
     s8 suffix = S(".pc\0");
-    size pathlen = dir.len + sep.len + pc.len + suffix.len;
+    iz pathlen = dir.len + sep.len + pc.len + suffix.len;
     s8 path = news8(perm, pathlen);
     s8 p = path;
     p = s8copy(p, dir);
@@ -599,9 +599,9 @@ static s8 *fieldbyname(pkg *p, s8 name)
 }
 
 typedef struct {
-    pkg  *pkgs;
-    pkg  *head;
-    size  count;
+    pkg *pkgs;
+    pkg *head;
+    iz   count;
 } pkgs;
 
 // Locate a previously-loaded package, or allocate zero-initialized
@@ -631,7 +631,7 @@ static void prepend(pkgs *t, pkg *p)
 
 static b32 allpresent(pkgs t)
 {
-    size count = 0;
+    iz count = 0;
     for (pkg *p = t.head; p; p = p->list) {
         count++;
     }
@@ -647,7 +647,7 @@ typedef struct {
 } parseresult;
 
 // Return the number of escape bytes at the beginning of the input.
-static size escaped(s8 s)
+static iz escaped(s8 s)
 {
     if (startswith(s, S("\\\n"))) {
         return 2;
@@ -661,12 +661,12 @@ static size escaped(s8 s)
 // Return a copy of the input with the escapes squashed out.
 static s8 stripescapes(arena *perm, s8 s)
 {
-    size len = 0;
+    iz len = 0;
     s8 c = news8(perm, s.len);
-    for (size i = 0; i < s.len; i++) {
+    for (iz i = 0; i < s.len; i++) {
         u8 b = s.s[i];
         if (b == '\\') {
-            size r = escaped(cuthead(s, i));
+            iz r = escaped(cuthead(s, i));
             if (r) {
                 i += r - 1;
             } else if (i<s.len-1 && s.s[i+1]=='#') {
@@ -722,12 +722,12 @@ static void opfail(u8buf *err, versop op, pkg *p)
     os_fail();
 }
 
-static pkgspec *parsespecs(s8 *args, size nargs, pkg *p, u8buf *err, arena *a)
+static pkgspec *parsespecs(s8 *args, iz nargs, pkg *p, u8buf *err, arena *a)
 {
     pkgspec *head = 0;
     pkgspec *pkg  = 0;
 
-    for (size i = 0; i < nargs; i++) {
+    for (iz i = 0; i < nargs; i++) {
         s8pair sp = {0};
         sp.tail = args[i];
         for (;;) {
@@ -816,7 +816,7 @@ static parseresult parsepackage(s8 src, arena *perm)
         // Skip leading space; newlines may be escaped with a backslash
         while (p < e) {
             if (*p == '\\') {
-                size r = escaped(s8span(p, e));
+                iz r = escaped(s8span(p, e));
                 if (r) {
                     p += r;
                 } else {
@@ -842,7 +842,7 @@ static parseresult parsepackage(s8 src, arena *perm)
                     end = p + 1;
                     cleanup = 1;
                 }
-                size r = escaped(s8span(p, e));
+                iz r = escaped(s8span(p, e));
                 if (r) {
                     // Escaped newline, skip over
                     p += r - 1;
@@ -877,13 +877,13 @@ static void missing(u8buf *err, s8 option)
 }
 
 typedef struct {
-    size nargs;
-    s8  *args;
-    size index;
-    b32  dashdash;
+    iz  nargs;
+    s8 *args;
+    iz  index;
+    b32 dashdash;
 } options;
 
-static options newoptions(s8 *args, size nargs)
+static options newoptions(s8 *args, iz nargs)
 {
     options r = {0};
     r.nargs = nargs;
@@ -1045,8 +1045,8 @@ static s8 pathtorealname(s8 path)
         return path;
     }
 
-    size baselen = 0;
-    for (size i = 0; i < path.len; i++) {
+    iz baselen = 0;
+    for (iz i = 0; i < path.len; i++) {
         if (pathsep(path.s[i])) {
             baselen = i + 1;
         }
@@ -1095,7 +1095,7 @@ static void expand(u8buf *out, u8buf *err, env *global, pkg *p, s8 str)
     stack[top] = str;
     while (top >= 0) {
         s8 s = stack[top--];
-        for (size i = 0; i < s.len-1; i++) {
+        for (iz i = 0; i < s.len-1; i++) {
             if (s.s[i]=='$' && s.s[i+1]=='{') {
                 if (top >= countof(stack)-2) {
                     prints8(err, S("pkg-config: "));
@@ -1108,8 +1108,8 @@ static void expand(u8buf *out, u8buf *err, env *global, pkg *p, s8 str)
 
                 prints8(out, takehead(s, i));
 
-                size beg = i + 2;
-                size end = beg;
+                iz beg = i + 2;
+                iz end = beg;
                 for (; end<s.len && s.s[end]!='}'; end++) {}
                 s8 name = s8span(s.s+beg, s.s+end);
                 end += end < s.len;
@@ -1266,7 +1266,7 @@ typedef struct {
 static b32 shellmeta(u8 c)
 {
     s8 meta = S("\"!#%&'*<>?[\\]`{|}");
-    for (size i = 0; i < meta.len; i++) {
+    for (iz i = 0; i < meta.len; i++) {
         if (meta.s[i]==c || pathdecode(c)!=c) {
             return 1;
         }
@@ -1277,7 +1277,7 @@ static b32 shellmeta(u8 c)
 // Process the next token. Return it and the unprocessed remainder.
 static dequoted dequote(s8 s, arena *perm)
 {
-    size i = 0;
+    iz i = 0;
     u8 quote = 0;
     b32 escaped = 0;
     dequoted r = {0};
@@ -1353,7 +1353,7 @@ static dequoted dequote(s8 s, arena *perm)
 // version comparison specification like the original pkg-config.
 static i32 compareversions(s8 va, s8 vb)
 {
-    size i = 0;
+    iz i = 0;
     while (i<va.len && i<vb.len) {
         u8 a = va.s[i];
         u8 b = vb.s[i];
@@ -1606,13 +1606,13 @@ struct argpos {
     argpos *child[4];
     argpos *next;
     s8      arg;
-    size    position;
+    iz      position;
 };
 
 typedef struct {
     s8list  list;
     argpos *positions;
-    size    count;
+    iz      count;
 } args;
 
 static argpos *findargpos(argpos **m, s8 arg, arena *perm)
@@ -1639,7 +1639,7 @@ static b32 dedupable(s8 arg)
         return 1;
     }
     s8 flags = S("DILflm");
-    for (size i = 0; i < flags.len; i++) {
+    for (iz i = 0; i < flags.len; i++) {
         if (arg.s[1] == flags.s[i]) {
             return 1;
         }
@@ -1650,7 +1650,7 @@ static b32 dedupable(s8 arg)
 static void appendarg(args *args, s8 arg, arena *perm)
 {
     append(&args->list, arg, perm);
-    size position = args->count++;
+    iz position = args->count++;
     if (dedupable(arg)) {
         argpos *n = findargpos(&args->positions, arg, perm);
         if (!n->position || startswith(arg, S("-l"))) {
@@ -1667,7 +1667,7 @@ static void excludearg(args *args, s8 arg, arena *perm)
 }
 
 // Is this the correct position for the given argument?
-static b32 inposition(args *args, s8 arg, size position)
+static b32 inposition(args *args, s8 arg, iz position)
 {
     argpos *n = findargpos(&args->positions, arg, 0);
     return !n || n->position==position+1;
@@ -1675,14 +1675,14 @@ static b32 inposition(args *args, s8 arg, size position)
 
 typedef struct {
     arena *perm;
-    size  *argcount;
+    iz    *argcount;
     args   args;
     filter filter;
     b32    msvc;
     u8     delim;
 } fieldwriter;
 
-static fieldwriter newfieldwriter(filter f, size *argcount, arena *perm)
+static fieldwriter newfieldwriter(filter f, iz *argcount, arena *perm)
 {
     fieldwriter w = {0};
     w.perm = perm;
@@ -1754,7 +1754,7 @@ static void appendfield(u8buf *err, fieldwriter *w, pkg *p, s8 field)
 
 static void writeargs(u8buf *out, fieldwriter *w)
 {
-    size position = 0;
+    iz position = 0;
     u8 delim = w->delim ? w->delim : ' ';
     for (s8node *n = w->args.list.head; n; n = n->next) {
         s8 arg = n->str;
@@ -1774,7 +1774,7 @@ static void writeargs(u8buf *out, fieldwriter *w)
 static i32 parseuint(s8 s, i32 hi)
 {
     i32 v = 0;
-    for (size i = 0; i < s.len; i++) {
+    for (iz i = 0; i < s.len; i++) {
         u8 c = s.s[i];
         if (digit(c)) {
             v = v*10 + c - '0';
@@ -1796,7 +1796,7 @@ static void uconfig(config *conf)
     u8buf *out = newfdbuf(perm, 1, 1<<12);
     u8buf *err = newfdbuf(perm, 2, 1<<7);
     processor *proc = newprocessor(conf, err, &global);
-    size argcount = 0;
+    iz argcount = 0;
 
     b32 msvc = 0;
     b32 libs = 0;
@@ -1827,7 +1827,7 @@ static void uconfig(config *conf)
     *insert(&global, S("pc_top_builddir"), perm) = top_builddir;
 
     s8 *args = new(perm, s8, conf->nargs);
-    size nargs = 0;
+    iz nargs = 0;
 
     for (options opts = newoptions(conf->args, conf->nargs);;) {
         optresult r = nextoption(&opts);
