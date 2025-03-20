@@ -36,6 +36,14 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
     return r;
 }
 
+static s8node *os_listing(os *ctx, arena *a, s8 path)
+{
+    (void)ctx;
+    (void)a;
+    (void)path;
+    assert(0);
+}
+
 int main(void)
 {
     __AFL_INIT();

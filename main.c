@@ -143,6 +143,14 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
     return r;
 }
 
+static s8node *os_listing(os *ctx, arena *a, s8 path)
+{
+    (void)ctx;
+    (void)a;
+    (void)path;
+    return 0;
+}
+
 static void os_write(os *ctx, i32 fd, s8 s)
 {
     (void)ctx;

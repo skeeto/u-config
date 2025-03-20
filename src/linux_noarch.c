@@ -83,6 +83,57 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
     return r;
 }
 
+static b32 endswith_(s8 s, s8 suffix)
+{
+    return s.len>=suffix.len && s8equals(taketail(s, suffix.len), suffix);
+}
+
+static s8node *os_listing(os *ctx, arena *a, s8 path)
+{
+    (void)ctx;
+    assert(path.s);
+    assert(path.len);
+    assert(!path.s[path.len-1]);
+
+    // NOTE: will allocate while holding this file descriptor
+    enum { O_DIRECTORY = 0x10000 };
+    int fd = (int)syscall2(SYS_open, (long)path.s, O_DIRECTORY);
+    if (fd < 0) {
+        return 0;
+    }
+
+    iz     cap   = 1<<14;
+    byte  *buf   = new(a, byte, cap);
+    s8list files = {0};
+    for (;;) {
+        iz len = syscall3(SYS_getdents64, fd, (long)buf, cap);
+        if (len < 1) {
+            break;
+        }
+
+        for (iz off = 0; off < len;) {
+            struct {
+                long long ino;
+                long long off;
+                short     len;
+                char      type;
+                u8        name[];
+            } *dents = (void *)(buf + off);
+            off += dents->len;
+
+            s8 name = s8fromcstr(dents->name);
+            if (endswith_(name, S(".pc"))) {
+                s8 copy = news8(a, name.len);
+                s8copy(copy, name);
+                append(&files, copy, a);
+            }
+        }
+    }
+
+    syscall1(SYS_close, fd);
+    return files.head;
+}
+
 static arena getarena_(void)
 {
     static byte heap[1<<22];
@@ -96,6 +147,7 @@ static config *newconfig_(void)
     arena perm = getarena_();
     config *conf = new(&perm, config, 1);
     conf->perm = perm;
+    conf->haslisting = 1;
     return conf;
 }
 

@@ -26,15 +26,28 @@ enum {
     STD_ERROR_HANDLE  = -12,
 };
 
+typedef struct {
+    i32 attr;
+    u32 create[2], access[2], write[2];
+    u32 size[2];
+    u32 reserved1[2];
+    c16 name[260];
+    c16 altname[14];
+    u32 reserved2[2];
+} finddata;
+
 #define W32(r) __declspec(dllimport) r __stdcall
 W32(b32)    CloseHandle(iptr);
 W32(i32)    CreateFileW(c16 *, i32, i32, uptr, i32, i32, i32);
 W32(void)   ExitProcess(i32);
+W32(b32)    FindClose(iptr);
+W32(iptr)   FindFirstFileW(c16 *, finddata *);
+W32(b32)    FindNextFileW(iptr, finddata *);
 W32(c16 *)  GetCommandLineW(void);
 W32(b32)    GetConsoleMode(iptr, i32 *);
 W32(i32)    GetEnvironmentVariableW(c16 *, c16 *, i32);
 W32(i32)    GetModuleFileNameW(iptr, c16 *, i32);
-W32(i32)    GetStdHandle(i32);
+W32(iptr)   GetStdHandle(i32);
 W32(b32)    ReadFile(iptr, u8 *, i32, i32 *, uptr);
 W32(byte *) VirtualAlloc(uptr, iz, i32, i32);
 W32(b32)    WriteConsoleW(iptr, c16 *, i32, i32 *, uptr);

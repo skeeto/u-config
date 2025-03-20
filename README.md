@@ -63,7 +63,8 @@ u-config compiles as one translation unit. Choose an appropriate platform
 layer (`main_*.c`) for your target then invoke your C compiler only that
 source file. The unadorned `main.c` is "generic" libc and mostly works
 everywhere, but inherits the target's libc limitations (restricted path
-and environment variable access, no automatic self-configuration, etc.).
+and environment variable access, no automatic self-configuration, no
+`--list-*` options, etc.).
 
     $ cc -Os -o pkg-config main.c
 

@@ -76,6 +76,72 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
     return r;
 }
 
+static iz s8compare_(s8 a, s8 b)
+{
+    iz len = a.len<b.len ? a.len : b.len;
+    iz r   = u8compare(a.s, b.s, len);
+    return r ? r : a.len-b.len;
+}
+
+static s8node *s8sort_(s8node *head)
+{
+    if (!head || !head->next) {
+        return head;
+    }
+
+    iz      len  = 0;
+    s8node *tail = head;
+    s8node *last = head;
+    for (s8node *n = head; n; n = n->next, len++) {
+        if (len & 1) {
+            last = tail;
+            tail = tail->next;
+        }
+    }
+
+    last->next = 0;
+    head = s8sort_(head);
+    tail = s8sort_(tail);
+
+    s8node  *rhead = 0;
+    s8node **rtail = &rhead;
+    while (head && tail) {
+        if (s8compare_(head->str, tail->str) < 1) {
+            *rtail = head;
+            head = head->next;
+        } else {
+            *rtail = tail;
+            tail = tail->next;
+        }
+        rtail = &(*rtail)->next;
+    }
+    *rtail = head ? head : tail;
+    return rhead;
+}
+
+static s8list os_listing_(s8list r, env *fs, arena *a, s8 path)
+{
+    if (fs) {
+        if (startswith(fs->name, path)) {
+            append(&r, cuthead(fs->name, path.len+1), a);
+        }
+        for (i32 i = 0; i < 4; i++) {
+            r = os_listing_(r, fs->child[i], a, path);
+        }
+    }
+    return r;
+}
+
+static s8node *os_listing(os *ctx, arena *a, s8 path)
+{
+    assert(path.s);
+    assert(path.len);
+    assert(!path.s[path.len-1]);
+    s8list r = {0};
+    r = os_listing_(r, ctx->filesystem, a, cuttail(path, 1));
+    return s8sort_(r.head);  // sort for determinism
+}
+
 static void os_write(os *ctx, i32 fd, s8 s)
 {
     assert(fd==1 || fd==2);
@@ -130,6 +196,7 @@ static config newtest_(arena a, s8 name)
     conf.fixedpath = S("/usr/lib/pkgconfig:/usr/share/pkgconfig");
     conf.perm = a;
     conf.perm.ctx = ctx;
+    conf.haslisting = 1;
     return conf;
 }
 
@@ -696,6 +763,49 @@ static void test_parens(arena a)
     );
 }
 
+static void test_listing(arena a)
+{
+    config conf = newtest_(a, S("package listing"));
+    newfile_(&conf, S("/usr/lib/pkgconfig/alpha.pc"), S(
+        "Name: Alpha\n"
+        "Version: 1.23\n"
+        "Description: the first package\n"
+    ));
+    newfile_(&conf, S("/usr/share/pkgconfig/beta.pc"), S(
+        "Name: Beta\n"
+        "Version: 4.56\n"
+        "Description: the second package\n"
+    ));
+    newfile_(&conf, S("/usr/lib/pkgconfig/omega.pc"), S(
+        "Name: Omega\n"
+        "Version: 7.89\n"
+        "Description: the last package\n"
+    ));
+    newfile_(&conf, S("/usr/share/pkgconfig/zeta.pc"), S(
+        PCHDR
+    ));
+    newfile_(&conf, S("/tmp/invisible.pc"), S(
+        PCHDR
+    ));
+
+    SHOULDPASS {
+        run(conf, S("--list-package-names"), E);
+    }
+    EXPECT(  // NOTE: grouped by directory; pkg-config doesn't sort
+        "alpha\nomega\nbeta\nzeta\n"
+    );
+
+    SHOULDPASS {
+        run(conf, S("--list-all"), E);
+    }
+    EXPECT(
+        "alpha                          Alpha - the first package\n"
+        "omega                          Omega - the last package\n"
+        "beta                           Beta - the second package\n"
+        "zeta                            - \n"
+    );
+}
+
 static void test_error_messages(arena a)
 {
     // Check that error messages mention important information
@@ -911,6 +1021,7 @@ int main(void)
     test_staticorder(a);
     test_windows(a);
     test_parens(a);
+    test_listing(a);
     test_error_messages(a);
     test_manyvars(a);
     test_lol(a);

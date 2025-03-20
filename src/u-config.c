@@ -24,6 +24,12 @@ typedef struct {
     iz  len;
 } s8;
 
+typedef struct s8node s8node;
+struct s8node {
+    s8node *next;
+    s8      str;
+};
+
 typedef struct {
     byte *beg;
     byte *end;
@@ -45,6 +51,7 @@ typedef struct {
     s8    print_sysinc;  // $PKG_CONFIG_ALLOW_SYSTEM_CFLAGS or empty
     s8    print_syslib;  // $PKG_CONFIG_ALLOW_SYSTEM_LIBS or empty
     b32   define_prefix;
+    b32   haslisting;
     u8    delim;
 } config;
 
@@ -66,6 +73,10 @@ typedef struct {
 // Load a file into memory, maybe using the arena. The path must include
 // a null terminator since it may be passed directly to the OS interface.
 static filemap os_mapfile(os *, arena *, s8 path);
+
+// List all .pc files under a particular path. The path must include a
+// null terminator since it may be passed directly to the OS interface.
+static s8node *os_listing(os *, arena *, s8 path);
 
 // Write buffer to stdout (1) or stderr (2). The platform must detect
 // write errors and arrange for an eventual non-zero exit status.
@@ -972,6 +983,8 @@ static void usage(u8buf *b)
     "  --errors-to-stdout\n"
     "  --keep-system-cflags, --keep-system-libs\n"
     "  --libs, --libs-only-L, --libs-only-l, --libs-only-other\n"
+    "  --list-all\n"
+    "  --list-package-names\n"
     "  --maximum-traverse-depth=N\n"
     "  --modversion\n"
     "  --msvc-syntax\n"
@@ -990,12 +1003,6 @@ static void usage(u8buf *b)
     "  PKG_CONFIG_ALLOW_SYSTEM_LIBS\n";
     prints8(b, S(usage));
 }
-
-typedef struct s8node s8node;
-struct s8node {
-    s8node *next;
-    s8      str;
-};
 
 typedef struct {
     s8node  *head;
@@ -1788,6 +1795,53 @@ static void writeargs(u8buf *out, fieldwriter *w)
     }
 }
 
+static void list(u8buf *out, u8buf *err, env *g, arena a, s8node *dirs, b32 all)
+{
+    for (s8node *dir = dirs; dir; dir = dir->next) {
+        arena scratch = a;
+
+        u8buf buf = newmembuf(&scratch);
+        prints8(&buf, dir->str);
+        printu8(&buf, 0);
+        s8 pathz = finalize(&buf);
+        s8node *files = os_listing(a.ctx, &scratch, pathz);
+
+        for (s8node *file = files; file; file = file->next) {
+            arena temp = scratch;
+
+            s8 name = file->str;
+            if (name.len > 3) {
+                name = cuttail(name, 3);  // remove extension
+            }
+            s8 path = buildpath(dir->str, name, &temp);
+
+            filemap m = os_mapfile(a.ctx, &temp, path);
+            if (m.status != filemap_OK) {
+                continue;
+            }
+
+            parseresult r = parsepackage(m.data, &temp);
+            if (r.err != parse_OK) {
+                continue;
+            }
+
+            prints8(out, name);
+            if (all) {
+                // NOTE: pkgconf does not correctly format Unicode names
+                // in this 30-column field, so we won't either.
+                for (iz i = name.len; i < 30; i++) {
+                    printu8(out, ' ');
+                }
+                printu8(out, ' ');
+                expand(out, err, g, &r.pkg, r.pkg.name);
+                prints8(out, S(" - "));
+                expand(out, err, g, &r.pkg, r.pkg.description);
+            }
+            printu8(out, '\n');
+        }
+    }
+}
+
 static i32 parseuint(s8 s, i32 hi)
 {
     i32 v = 0;
@@ -1828,6 +1882,9 @@ static void uconfig(config *conf)
     b32 print_sysinc = !!conf->print_sysinc.s;
     b32 print_syslib = !!conf->print_syslib.s;
     s8 variable = {0};
+
+    enum { list_NONE, list_ALL, list_NAMES };
+    i32 listing = list_NONE;
 
     proc->define_prefix = conf->define_prefix;
     s8 top_builddir = conf->top_builddir;
@@ -2016,6 +2073,24 @@ static void uconfig(config *conf)
             silent = 1;
             proc->recursive = 0;
 
+        } else if (s8equals(r.arg, S("-list-all"))) {
+            if (!conf->haslisting) {
+                prints8(err, S("pkg-config: "));
+                prints8(err, S("--list-all is unimplemented\n"));
+                flush(err);
+                os_fail(err->ctx);
+            }
+            listing = list_ALL;
+
+        } else if (s8equals(r.arg, S("-list-package-names"))) {
+            if (!conf->haslisting) {
+                prints8(err, S("pkg-config: "));
+                prints8(err, S("--list-package-names is unimplemented\n"));
+                flush(err);
+                os_fail(err->ctx);
+            }
+            listing = list_NAMES;
+
         } else {
             prints8(err, S("pkg-config: "));
             prints8(err, S("unknown option -"));
@@ -2032,6 +2107,13 @@ static void uconfig(config *conf)
 
     if (silent) {
         proc->err = err = newnullout(perm);
+    }
+
+    if (listing) {
+        s8node *dirs = proc->search.list.head;
+        list(out, err, global, *perm, dirs, listing==list_ALL);
+        flush(out);
+        return;
     }
 
     pkgspec *specs = parsespecs(args, nargs, 0, err, perm);

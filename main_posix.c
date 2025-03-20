@@ -1,5 +1,6 @@
 // POSIX platform layer for u-config
 // This is free and unencumbered software released into the public domain.
+#include <dirent.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -88,6 +89,38 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
     return r;
 }
 
+static b32 endswith_(s8 s, s8 suffix)
+{
+    return s.len>=suffix.len && s8equals(taketail(s, suffix.len), suffix);
+}
+
+static s8node *os_listing(os *ctx, arena *a, s8 path)
+{
+    (void)ctx;
+    assert(path.s);
+    assert(path.len);
+    assert(!path.s[path.len-1]);
+
+    // NOTE: will allocate while holding this handle
+    DIR *handle = opendir((char *)path.s);
+    if (!handle) {
+        return 0;
+    }
+
+    s8list files = {0};
+    for (struct dirent *d; (d = readdir(handle));) {
+        s8 name = s8fromcstr((u8 *)d->d_name);
+        if (endswith_(name, S(".pc"))) {
+            s8 copy = news8(a, name.len);
+            s8copy(copy, name);
+            append(&files, copy, a);
+        }
+    }
+
+    closedir(handle);
+    return files.head;
+}
+
 static arena newarena_(void)
 {
     iz cap = (iz)1<<22;
@@ -106,6 +139,7 @@ static config *newconfig_(void)
     arena perm = newarena_();
     config *conf = new(&perm, config, 1);
     conf->perm = perm;
+    conf->haslisting = 1;
     return conf;
 }
 

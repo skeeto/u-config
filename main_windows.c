@@ -12,9 +12,9 @@
 // For communication with os_write()
 struct os {
     struct {
-        i32 h;
-        b32 isconsole;
-        b32 err;
+        iptr h;
+        b32  isconsole;
+        b32  err;
     } handles[3];
 };
 
@@ -308,6 +308,7 @@ static config *newconfig_(os *ctx)
     perm.ctx = ctx;
     config *conf = new(&perm, config, 1);
     conf->perm = perm;
+    conf->haslisting = 1;
     return conf;
 }
 
@@ -408,6 +409,40 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
     return r;
 }
 
+static s8node *os_listing(os *ctx, arena *a, s8 path)
+{
+    assert(ctx);
+    assert(path.len > 0);
+    assert(!path.s[path.len-1]);
+
+    // NOTE: will allocate while holding this handle
+    iptr     handle = -1;
+    finddata fd     = {0};
+    {
+        arena scratch = *a;
+        u8buf buf = newmembuf(&scratch);
+        prints8(&buf, cuttail(path, 1));
+        prints8(&buf, S("\\*.pc\0"));
+        s8  glob = finalize(&buf);
+        s16 wide = towide_(&scratch, glob);
+        handle = FindFirstFileW(wide.s, &fd);
+        if (handle == -1) {
+            return 0;
+        }
+    }
+
+    s8list files = {0};
+    do {
+        s16 name = {0};
+        name.s = fd.name;
+        for (; name.s[name.len]; name.len++) {}
+        append(&files, fromwide_(a, name), a);
+    } while (FindNextFileW(handle, &fd));
+
+    FindClose(handle);
+    return files.head;
+}
+
 static void os_fail(os *ctx)
 {
     assert(ctx);
@@ -416,10 +451,10 @@ static void os_fail(os *ctx)
 }
 
 typedef struct {
-    c16 buf[1<<8];
-    i32 len;
-    i32 handle;
-    b32 err;
+    c16  buf[1<<8];
+    iptr handle;
+    i32  len;
+    b32  err;
 } u16buf;
 
 static void flushconsole_(u16buf *b)
@@ -449,7 +484,7 @@ static void os_write(os *ctx, i32 fd, s8 s)
         return;
     }
 
-    i32 handle = ctx->handles[fd].h;
+    iptr handle = ctx->handles[fd].h;
     if (ctx->handles[fd].isconsole) {
         // NOTE: There is a small chance that a multi-byte code point
         // spans flushes from the application. With no decoder state

@@ -2,11 +2,14 @@
 // This is free and unencumbered software released into the public domain.
 #include "src/u-config.c"
 
-#define SYS_close 6
-#define SYS_exit  1
-#define SYS_open  5
-#define SYS_read  3
-#define SYS_write 4
+enum {
+    SYS_close       = 6,
+    SYS_exit        = 1,
+    SYS_open        = 5,
+    SYS_read        = 3,
+    SYS_write       = 4,
+    SYS_getdents64  = 220,
+};
 
 #include "src/linux_noarch.c"
 
