@@ -9,7 +9,7 @@ CC    = gcc
 OPT   = -Os
 PC    = pkg-config  # e.g. for CROSS-pkg-config
 
-DEBUG_CFLAGS = -g3 -Wall -Wextra -Wconversion -Wno-sign-conversion \
+DEBUG_CFLAGS = -g3 -Wall -Wextra -Wconversion \
   -fsanitize=undefined -fsanitize-undefined-trap-on-error
 WIN32_CFLAGS = -fno-builtin -fno-asynchronous-unwind-tables
 WIN32_LIBS   = -s -nostdlib -Wl,--gc-sections -lkernel32

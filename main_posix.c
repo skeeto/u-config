@@ -125,7 +125,7 @@ static arena newarena_(void)
 {
     iz cap = (iz)1<<22;
     arena a = {0};
-    a.beg = malloc(cap);
+    a.beg = malloc((size_t)cap);
     if (!a.beg) {
         a.beg = (byte *)16;  // aligned, non-null, zero-size arena
         cap = 0;

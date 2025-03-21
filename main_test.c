@@ -994,7 +994,7 @@ static void test_lol(arena a)
 static arena newarena_(iz cap)
 {
     arena arena = {0};
-    arena.beg = malloc(cap);
+    arena.beg = malloc((size_t)cap);
     if (!arena.beg) {
         __builtin_trap();
     }

@@ -53,7 +53,7 @@ static arena newarena_(void)
 {
     iz cap = (iz)1<<22;
     arena a = {0};
-    a.beg = malloc(cap);
+    a.beg = malloc((size_t)cap);
     if (!a.beg) {
         a.beg = (byte *)16;  // aligned, non-null, zero-size arena
         cap = 0;
@@ -78,7 +78,7 @@ static s8 s8getenv_(char *k)
 int main(int argc, char **argv)
 {
     config *conf = newconfig_();
-    conf->delim = PATHDELIM[0];
+    conf->delim = (u8)PATHDELIM[0];
     conf->define_prefix = PKG_CONFIG_DEFINE_PREFIX;
 
     if (argc) {
@@ -129,7 +129,7 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
 
     r.data.s = (u8 *)perm->beg;
     iz available = perm->end - perm->beg;
-    r.data.len = fread(r.data.s, 1, available, f);
+    r.data.len = (iz)fread(r.data.s, 1, (size_t)available, f);
     fclose(f);
 
     if (r.data.len == available) {
@@ -156,7 +156,7 @@ static void os_write(os *ctx, i32 fd, s8 s)
     (void)ctx;
     assert(fd==1 || fd==2);
     FILE *f = fd==1 ? stdout : stderr;
-    fwrite(s.s, s.len, 1, f);
+    fwrite(s.s, (size_t)s.len, 1, f);
     fflush(f);
 }
 
