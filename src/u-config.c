@@ -929,12 +929,10 @@ typedef struct {
 static optresult nextoption(options *p)
 {
     optresult r = {0};
-
-    if (p->index == p->nargs) {
-        return r;
-    }
-
     for (;;) {
+        if (p->index == p->nargs) {
+            return r;
+        }
         s8 arg = p->args[p->index++];
 
         if (p->dashdash || arg.len<2 || arg.s[0]!='-') {
