@@ -61,15 +61,7 @@ backslash syntax.
 
 u-config compiles as one translation unit. Choose an appropriate platform
 layer (`main_*.c`) for your target then invoke your C compiler only that
-source file. The unadorned `main.c` is "generic" libc and mostly works
-everywhere, but inherits the target's libc limitations (restricted path
-and environment variable access, no automatic self-configuration, no
-`--list-*` options, etc.).
-
-    $ cc -Os -o pkg-config main.c
-
-Builds for POSIX hosts should prefer the POSIX platform layer instead of
-the generic libc platform:
+source file.
 
     $ cc -Os -o pkg-config main_posix.c
 
@@ -105,9 +97,9 @@ drop-in replacement for it.
 
     $ make pkg-config   # grabs system's pkg-config search path
 
-### Generic and POSIX configuration options
+### POSIX configuration options
 
-The "generic" platform has several compile time configuration parameters.
+The POSIX platform has several compile time configuration parameters.
 Each must be formatted as a C string with quotes. Relative paths will be
 relative to the run-time working directory, not the installation prefix,
 which is usually not useful.
@@ -165,7 +157,7 @@ order to reduce issues involving backslash as a shell metacharacter.
 `main_linux_*.c` makes direct Linux system calls using assembly and does
 not require libc. It compiles to a ~20kB static executable that will work
 on any Linux distribution. It supports these configuration macros with the
-same behavior as the generic platform.
+same behavior as the POSIX platform.
 
 * `PKG_CONFIG_LIBDIR`
 * `PKG_CONFIG_SYSTEM_INCLUDE_PATH`
