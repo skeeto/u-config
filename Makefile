@@ -76,6 +76,11 @@ tests.exe: main_test.c src/u-config.c
 tests: main_test.c src/u-config.c
 	$(CC) $(DEBUG_CFLAGS) -Wno-clobbered -o $@ main_test.c
 
+u-config.wasm: main_wasm.c src/u-config.c
+	clang --target=wasm32 -nostdlib -Os -fno-builtin \
+	      -Wall -Wextra -Wconversion -Wno-unused-parameter \
+	      -s -Wl,--stack-first -Wl,--no-entry -o $@ main_wasm.c
+
 check test: tests$(EXE)
 	./tests$(EXE)
 
@@ -91,5 +96,5 @@ clean:
 	      pkg-config-linux-amd64 pkg-config-linux-amd64-debug \
 	      pkg-config-linux-i686 pkg-config-linux-i686-debug \
 	      pkg-config.c u-config-*.tar.gz \
-	      tests.exe tests \
+	      tests.exe tests u-config.wasm \
 	      *.ilk *.obj *.pdb main_test.exe
