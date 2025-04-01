@@ -119,21 +119,3 @@ void wasm_uconfig(void)
     conf.haslisting = 1;
     uconfig(&conf);
 }
-
-void *memset(u8 *dst, i32 c, iz len)
-{
-    u8 *r = dst;
-    while (len--) {
-        *dst++ = (u8)c;
-    }
-    return r;
-}
-
-void *memcpy(u8 *dst, u8 *src, iz len)
-{
-    u8 *r = dst;
-    while (len--) {
-        *dst++ = *src++;
-    }
-    return r;
-}
