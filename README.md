@@ -11,8 +11,8 @@ Notable features:
 * Windows as a first-class supported platform.
 
 * Highly portable to any machine. Supports a variety of compilers and
-  operating systems, ancient and new. Can be built without libc, which is
-  handy for bootstrapping.
+  operating systems, ancient and new. [Even WebAssembly][wasm]! Can be
+  built without libc, which is handy for bootstrapping.
 
 * Trivial, fast build. No messing around with GNU Autotools, or any build
   system for that matter.
@@ -77,6 +77,10 @@ configuration:
 Or with MSVC:
 
     $ cl /GS- /O2 /Os /Fe:pkg-config main_msvc.c
+
+Or a WebAssembly (WASI) build:
+
+	$ clang --target=wasm32 -nostdlib -Os -o pkg-config.wasm main_wasm.c
 
 The Makefile documents compiler options for a more aggressively optimized
 GCC-based build.
@@ -193,3 +197,4 @@ usage.
 [pkg-config]: https://www.freedesktop.org/wiki/Software/pkg-config/
 [pkgconf]: http://pkgconf.org/
 [w64devkit]: https://github.com/skeeto/w64devkit
+[wasm]: https://skeeto.github.io/u-config/

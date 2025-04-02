@@ -1,0 +1,233 @@
+<!doctype html>
+<!-- $ make pkg-config.wasm -->
+<title>u-config (WASM)</title>
+
+<style>
+body {
+    background: #eee;
+}
+#args {
+    display: block;
+    font-family: monospace;
+    width: 100%;
+}
+#output {
+    background: #fff;
+    padding: 0.5em;
+}
+</style>
+
+<p>
+  <label for="files">.pc files:</label>
+  <input id="files" type="file" multiple/>
+  <button id="clear">clear</button>
+  <button id="run">execute</button>
+</p>
+
+<p>
+  <label for="args">Arguments:</label>
+  <input id="args" type="text" value="--help"/>
+</p>
+
+<pre id="output"></pre>
+
+<script>
+async function uconfig_load() {
+    let response = await fetch('pkg-config.wasm')
+    let bytes    = await response.arrayBuffer()
+    let module   = await WebAssembly.compile(bytes)
+
+    function concat(bufs) {
+        let total = 0
+        for (let buf of bufs) {
+            total += buf.length
+        }
+
+        let r   = new Uint8Array(total)
+        let off = 0
+        for (let buf of bufs) {
+            total += buf.length
+            r.set(buf, off)
+            off += buf.length
+        }
+        return r
+    }
+
+    return function(args, files) {
+        let output  = [null, [], []]
+        let memory  = null
+        let file    = null
+        let dir     = null
+
+        let uargslen = 1
+        let uargs = [new Uint8Array()]
+        for (let arg of args) {
+            let uarg = new TextEncoder().encode(arg)
+            uargs.push(uarg)
+            uargslen += uarg.length + 1
+        }
+
+        let imports = {
+            wasi_unstable: {
+                args_get: function(argv, ptr) {
+                    for (let n = 0; n < uargs.length; n++) {
+                        memory.setInt32(argv + n*4, ptr, true)
+                        for (let i = 0; i < uargs[n].length; i++) {
+                            memory.setUint8(ptr++, uargs[n][i])
+                        }
+                        memory.setUint8(ptr++, 0)
+                    }
+                },
+
+                args_sizes_get: function(pargc, plen) {
+                    memory.setInt32(pargc, uargs.length, true)
+                    memory.setInt32(plen,  uargslen,     true)
+                },
+
+                environ_get: function(envp, ptr) {
+                    return 0
+                },
+
+                environ_sizes_get: function(pcount, plen) {
+                    memory.setInt32(pcount, 0, true)
+                    memory.setInt32(plen,   0, true)
+                    return 0
+                },
+
+                fd_close: function(fd) {
+                    file = null
+                    return 0
+                },
+
+                fd_read: function(fd, piov, count, plen) {
+                    console.assert(file)
+                    console.assert(count == 1)
+                    let ptr = memory.getInt32(piov+0, true)
+                    let len = memory.getInt32(piov+4, true)
+                    if (len > file.length) {
+                        len = file.length
+                    }
+                    for (let i = 0; i < len; i++) {
+                        let len = memory.setUint8(ptr+i, file[i])
+                    }
+                    memory.setInt32(plen, len, true)
+                    return 0
+                },
+
+                fd_readdir: function(fd, ptr, len, cookie, plen) {
+                    let total = 0;
+                    if (cookie < dir.length) {
+                        // NOTE: One file at a time, and assume it fits.
+                        let name = dir[cookie]
+                        memory.setBigInt64(ptr+0, cookie+1n, true)
+                        memory.setInt32(ptr+16, name.length, true)
+                        for (let i = 0; i < name.length; i++) {
+                            memory.setUint8(ptr+24+i, name[i])
+                        }
+                        total = 24 + name.length
+                    }
+                    memory.setInt32(plen, total, true)
+                    return 0
+                },
+
+                fd_write: function(fd, piov, count, plen) {
+                    console.assert(count == 1)
+                    let ptr = memory.getInt32(piov+0, true)
+                    let len = memory.getInt32(piov+4, true)
+                    let buf = new Uint8Array(memory.buffer, ptr, len)
+                    output[fd].push(buf.slice())
+                    memory.setInt32(plen, len, true)
+                    return 0
+                },
+
+                path_open: function(_, _, ptr, len, of, fs, _, _, pfd) {
+                    let utf8 = new Uint8Array(memory.buffer, ptr, len)
+                    let path = new TextDecoder().decode(utf8)
+
+                    if (of) {  // directory
+                        dir = []
+                        for (let name of Object.keys(files)) {
+                            if (name.startsWith(path)) {
+                                let base = name.substring(path.length+1)
+                                dir.push(new TextEncoder().encode(base))
+                            }
+                        }
+                    } else {  // file
+                        file = files[path]
+                        if (file == null) {
+                            return 44
+                        }
+                    }
+
+                    // always uses fd == 4
+                    memory.setInt32(pfd, 4, true)
+                    return 0
+                },
+
+                proc_exit: function(_) {
+                    throw null
+                },
+            }
+        }
+
+        let instance = new WebAssembly.Instance(module, imports)
+        let exports  = instance.exports
+        memory = new DataView(exports.memory.buffer)
+
+        try {
+            exports._start()
+            return new TextDecoder().decode(concat(output[1]))
+        } catch (e) {
+            if (e != null) {
+                console.log(e)
+            }
+            return new TextDecoder().decode(concat(output[2]))
+        }
+        instance.Close()
+    }
+}
+
+async function main() {
+    let uconfig = await uconfig_load()
+    let filesys = {}
+    let output  = document.querySelector("#output")
+    let args    = document.querySelector("#args")
+    let files   = document.querySelector("#files")
+    let run     = document.querySelector("#run")
+    let clear   = document.querySelector("#clear")
+
+    function execute() {
+        try {
+            let argv = args.value.split(/ +/)
+            output.textContent = uconfig(argv, filesys)
+        } catch (error) {
+            output.textContent = error
+        }
+    }
+
+    clear.addEventListener("click", function() {
+        filesys = {}
+        execute()
+    })
+    run.addEventListener("click", execute)
+    args.addEventListener("change", execute)
+    args.addEventListener("paste", execute)
+    args.addEventListener("input", execute)
+    files.addEventListener("change", function(e) {
+        for (let i = 0; i < files.files.length; i++) {
+            let file = files.files[i]
+            let name = "/usr/lib/pkgconfig/" + file.name
+            let reader = new FileReader()
+            reader.onload = function() {
+                filesys[name] = new Uint8Array(reader.result)
+                execute()
+            }
+            reader.readAsArrayBuffer(file)
+        }
+    })
+
+    execute()
+}
+
+main()
+</script>
