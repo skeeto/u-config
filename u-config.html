@@ -36,39 +36,39 @@ async function uconfig_load() {
     let response = await fetch('u-config.wasm')
     let bytes    = await response.arrayBuffer()
     let module   = await WebAssembly.compile(bytes)
-
-    return function(args, files) {
-        // NOTE(skeeto): Throwing from a WASM callback (i.e. abort)
-        // corrupts the WebAssembly instance by "leaking" stack. That
-        // is, the stack pointer continues from the throw on the next
-        // call. So we must create a fresh WASM instance after any such
-        // throw. To keep it simple, just create a fresh instance each
-        // run despite u-config being more than capable of resetting
-        // itself.
-        //
-        // I cannot find any way to reset the WASM instance, or a method
-        // to cleanly non-locally jump. This appears to be one of many
-        // limitations of LLVM/Clang's WASM toolchain.
-
-        let output  = [null, "", ""]
-        let memory  = null
-        let imports = {
-            env: {
-                abort: function() {
-                    throw output[2]
-                },
-                write: function(fd, ptr, len) {
-                    // FIXME: codepoints might straddle writes
-                    let utf8 = new Uint8Array(memory.buffer, ptr, len)
-                    let str  = new TextDecoder().decode(utf8)
-                    output[fd] += str
+    let output  = [null, "", ""]
+    let memory  = null
+    let imports = {
+        env: {
+            // https://github.com/WebAssembly/tool-conventions
+            __wasm_setjmp: function(env, label, id) {
+                memory.setInt32(env+0, id,    true)
+                memory.setInt32(env+4, label, true)
+            },
+            __wasm_setjmp_test: function(env, id) {
+                if (memory.getInt32(env+0, true) == id) {
+                    return memory.getInt32(env+4, true)
                 }
+                return 0
+            },
+            __wasm_longjmp: function(env, val) {
+                memory.setInt32(env+8,  env,       true)
+                memory.setInt32(env+12, val?val:1, true)
+                // NOTE: cannot throw here, so caller does it
+            },
+            write: function(fd, ptr, len) {
+                // FIXME: codepoints might straddle writes
+                let utf8 = new Uint8Array(memory.buffer, ptr, len)
+                let str  = new TextDecoder().decode(utf8)
+                output[fd] += str
             }
         }
-        let instance = new WebAssembly.Instance(module, imports)
-        let exports  = instance.exports
-        memory = new DataView(exports.memory.buffer)
+    }
+    let instance = new WebAssembly.Instance(module, imports)
+    let exports  = instance.exports
+    memory = new DataView(exports.memory.buffer)
 
+    return function(args, files) {
         function pushstring(s) {
             let utf8 = new TextEncoder().encode(s)
             let s8   = exports.pushstring(utf8.length)
@@ -92,13 +92,13 @@ async function uconfig_load() {
             exports.pusharg(pushstring(arg))
         }
 
-        exports.uconfig()
-        return output[1]
+        output[1] = output[2] = ""
+        return output[exports.uconfig()]
     }
 }
 
 async function main() {
-    let uconfig = await uconfig_load();
+    let uconfig = await uconfig_load()
     let filesys = {}
     let output  = document.querySelector("#output")
     let args    = document.querySelector("#args")

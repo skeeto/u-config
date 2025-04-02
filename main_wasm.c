@@ -1,21 +1,25 @@
 #include "src/u-config.c"
 
-__attribute((import_name("abort"))) void wasm_abort(void);
 __attribute((import_name("write"))) void wasm_write(i32, u8 *, iz);
+
+// https://github.com/WebAssembly/tool-conventions/blob/main/SetjmpLongjmp.md
+i32  setjmp(void *);        // becomes __wasm_setjmp
+void longjmp(void *, i32);  // becomes __wasm_longjmp + __wasm_setjmp_test
 
 struct os {
     arena perm;
     env  *filesystem;
     u8  **args;
     i32   nargs;
-} ctx;
+    void *jmpbuf[4];
+};
 
-static filemap os_mapfile(os *_, arena *a, s8 path)
+static filemap os_mapfile(os *ctx, arena *a, s8 path)
 {
     (void)a;
 
     filemap r = {0};
-    s8 *data = insert(&ctx.filesystem, cuttail(path, 1), 0);
+    s8 *data = insert(&ctx->filesystem, cuttail(path, 1), 0);
     if (!data) {
         r.status = filemap_NOTFOUND;
         return r;
@@ -37,13 +41,13 @@ static s8list os_listing_(s8list r, env *fs, arena *a, s8 path)
     return r;
 }
 
-static s8node *os_listing(os *_, arena *a, s8 path)
+static s8node *os_listing(os *ctx, arena *a, s8 path)
 {
     assert(path.s);
     assert(path.len);
     assert(!path.s[path.len-1]);
     s8list r = {0};
-    r = os_listing_(r, ctx.filesystem, a, cuttail(path, 1));
+    r = os_listing_(r, ctx->filesystem, a, cuttail(path, 1));
     return r.head;
 }
 
@@ -52,11 +56,14 @@ static void os_write(os *_, i32 fd, s8 data)
     wasm_write(fd, data.s, data.len);
 }
 
-static void os_fail(os *_)
+static void os_fail(os *ctx)
 {
-    wasm_abort();
-    __builtin_unreachable();
+    // It's a hacky mess, but it works.
+    longjmp(ctx->jmpbuf, 1);
+    __builtin_wasm_throw(1, ctx->jmpbuf+2);
 }
+
+static os ctx;
 
 // Free all prior allocations and reset this WASM instance to a clean
 // state. If uconfig exited via abort, this won't be enough.
@@ -66,6 +73,7 @@ void wasm_initialize(void)
     static byte heap[1<<21];
     ctx.perm.beg = heap;
     ctx.perm.end = heap + sizeof(heap);
+    ctx.perm.ctx = &ctx;
     ctx.filesystem = 0;
     ctx.args = 0;
     ctx.nargs = 0;
@@ -106,7 +114,7 @@ void wasm_pusharg(s8 *arg)
 }
 
 __attribute((export_name("uconfig")))
-void wasm_uconfig(void)
+i32 wasm_uconfig(void)
 {
     config conf = {0};
     conf.perm = ctx.perm;
@@ -117,5 +125,10 @@ void wasm_uconfig(void)
     conf.pc_syslibpath = conf.sys_libpath = S("/usr/lib");
     conf.delim = ':';
     conf.haslisting = 1;
+
+    if (setjmp(ctx.jmpbuf)) {
+        return 2;  // use standard error
+    }
     uconfig(&conf);
+    return 1;  // use standard output
 }

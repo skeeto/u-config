@@ -78,6 +78,7 @@ tests: main_test.c src/u-config.c
 
 u-config.wasm: main_wasm.c src/u-config.c
 	clang --target=wasm32 -nostdlib -Os -mbulk-memory \
+		  -mllvm -wasm-enable-sjlj \
 	      -Wall -Wextra -Wconversion -Wno-unused-parameter \
 	      -s -Wl,--stack-first -Wl,--no-entry -o $@ main_wasm.c
 
