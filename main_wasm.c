@@ -2,16 +2,11 @@
 
 __attribute((import_name("write"))) void wasm_write(i32, u8 *, iz);
 
-// https://github.com/WebAssembly/tool-conventions/blob/main/SetjmpLongjmp.md
-i32  setjmp(void *);        // becomes __wasm_setjmp
-void longjmp(void *, i32);  // becomes __wasm_longjmp + __wasm_setjmp_test
-
 struct os {
     arena perm;
     env  *filesystem;
     u8  **args;
     i32   nargs;
-    void *jmpbuf[4];
 };
 
 static filemap os_mapfile(os *ctx, arena *a, s8 path)
@@ -58,9 +53,7 @@ static void os_write(os *_, i32 fd, s8 data)
 
 static void os_fail(os *ctx)
 {
-    // It's a hacky mess, but it works.
-    longjmp(ctx->jmpbuf, 1);
-    __builtin_wasm_throw(1, ctx->jmpbuf+2);
+    __builtin_trap();
 }
 
 static os ctx;
@@ -114,7 +107,7 @@ void wasm_pusharg(s8 *arg)
 }
 
 __attribute((export_name("uconfig")))
-i32 wasm_uconfig(void)
+void wasm_uconfig(void)
 {
     config conf = {0};
     conf.perm = ctx.perm;
@@ -125,10 +118,5 @@ i32 wasm_uconfig(void)
     conf.pc_syslibpath = conf.sys_libpath = S("/usr/lib");
     conf.delim = ':';
     conf.haslisting = 1;
-
-    if (setjmp(ctx.jmpbuf)) {
-        return 2;  // use standard error
-    }
     uconfig(&conf);
-    return 1;  // use standard output
 }

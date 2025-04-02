@@ -40,22 +40,6 @@ async function uconfig_load() {
     let memory  = null
     let imports = {
         env: {
-            // https://github.com/WebAssembly/tool-conventions
-            __wasm_setjmp: function(env, label, id) {
-                memory.setInt32(env+0, id,    true)
-                memory.setInt32(env+4, label, true)
-            },
-            __wasm_setjmp_test: function(env, id) {
-                if (memory.getInt32(env+0, true) == id) {
-                    return memory.getInt32(env+4, true)
-                }
-                return 0
-            },
-            __wasm_longjmp: function(env, val) {
-                memory.setInt32(env+8,  env,       true)
-                memory.setInt32(env+12, val?val:1, true)
-                // NOTE: cannot throw here, so caller does it
-            },
             write: function(fd, ptr, len) {
                 // FIXME: codepoints might straddle writes
                 let utf8 = new Uint8Array(memory.buffer, ptr, len)
@@ -93,7 +77,14 @@ async function uconfig_load() {
         }
 
         output[1] = output[2] = ""
-        return output[exports.uconfig()]
+        try {
+            exports.uconfig()
+            return output[1]
+        } catch {
+            // Reset stack pointer after abnormal exit
+            exports.__stack_pointer.value = exports.__stack_high
+            return output[2]
+        }
     }
 }
 
