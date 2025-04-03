@@ -33,6 +33,11 @@ struct os {
     dirfd *dirs;
 };
 
+static b32 endswith_(s8 s, s8 suffix)
+{
+    return s.len>=suffix.len && s8equals(taketail(s, suffix.len), suffix);
+}
+
 static dirfd *find_preopens(arena *a)
 {
     dirfd  *head = 0;
@@ -44,10 +49,16 @@ static dirfd *find_preopens(arena *a)
         }
 
         s8 path = {0};
-        path.len = stat[1];
+        path.len = stat[1]+1;
         path.s   = new(a, u8, path.len);
-        if (fd_prestat_dir_name(fd, path.s, path.len)) {
+        if (fd_prestat_dir_name(fd, path.s, stat[1])) {
             return head;
+        }
+        path.s[stat[1]] = '/';
+
+        // Force exactly one trailing slash
+        while (endswith_(path, S("//"))) {
+            path = cuttail(path, 1);
         }
 
         *tail = new(a, dirfd, 1);
@@ -57,14 +68,42 @@ static dirfd *find_preopens(arena *a)
     }
 }
 
-static dirfd *find_dirfd(os *ctx, s8 path)
+typedef struct {
+    s8  relpath;
+    i32 fd;
+    b32 ok;
+} relpath;
+
+static relpath find_dirfd(os *ctx, s8 path)
 {
+    relpath r = {0};
     for (dirfd *d = ctx->dirs; d; d = d->next) {
-        if (startswith(path, d->path)) {
-            return d;
+        // Match without trailing slash
+        s8 dir = d->path;
+        while (endswith_(dir, S("/"))) {
+            dir = cuttail(dir, 1);
+        }
+
+        // TODO: parse path and match components
+        if (startswith(path, dir)) {
+            r.relpath = cuthead(path, dir.len);
+
+            // Remove leading slashes
+            while (startswith(r.relpath, S("/"))) {
+                r.relpath = cuthead(r.relpath, 1);
+            }
+
+            // Empty path really means current directory
+            if (!r.relpath.len) {
+                r.relpath = S(".");
+            }
+
+            r.fd = d->fd;
+            r.ok = 1;
+            return r;
         }
     }
-    return 0;
+    return r;
 }
 
 static filemap os_mapfile(os *ctx, arena *perm, s8 path)
@@ -72,18 +111,16 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
     filemap r = {0};
 
     path = cuttail(path, 1);  // remove null terminator
-    dirfd *dir = find_dirfd(ctx, path);
-    if (!dir) {
+    relpath rel = find_dirfd(ctx, path);
+    if (!rel.ok) {
         r.status = filemap_NOTFOUND;
         return r;
     }
-    if (path.len > dir->path.len) {
-        path = cuthead(path, dir->path.len+1);
-    }
+    path = rel.relpath;
 
     i32 fd  = -1;
     i32 err = path_open(
-        dir->fd, 0, path.s, path.len, 0, WASI_FD_READ, 0, 0, &fd
+        rel.fd, 0, path.s, path.len, 0, WASI_FD_READ, 0, 0, &fd
     );
     if (err) {
         r.status = filemap_NOTFOUND;
@@ -105,29 +142,20 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
     return r;
 }
 
-static b32 endswith_(s8 s, s8 suffix)
-{
-    return s.len>=suffix.len && s8equals(taketail(s, suffix.len), suffix);
-}
-
 static s8node *os_listing(os *ctx, arena *a, s8 path)
 {
     s8list r = {0};
 
     path = cuttail(path, 1);  // remove null terminator
-    dirfd *dir = find_dirfd(ctx, path);
-    if (!dir) {
+    relpath rel = find_dirfd(ctx, path);
+    if (!rel.ok) {
         return 0;
     }
-    if (path.len == dir->path.len) {
-        path = S(".");
-    } else {
-        path = cuthead(path, dir->path.len+1);
-    }
+    path = rel.relpath;
 
     i32 fd  = -1;
     i32 err = path_open(
-        dir->fd, 0,
+        rel.fd, 0,
         path.s, path.len,
         WASI_O_DIRECTORY, WASI_FD_READDIR, 0, 0, &fd
     );
