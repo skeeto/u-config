@@ -71,16 +71,19 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
 {
     filemap r = {0};
 
+    path = cuttail(path, 1);  // remove null terminator
     dirfd *dir = find_dirfd(ctx, path);
     if (!dir) {
         r.status = filemap_NOTFOUND;
         return r;
     }
-    path = cuthead(path, dir->path.len+1);
+    if (path.len > dir->path.len) {
+        path = cuthead(path, dir->path.len+1);
+    }
 
     i32 fd  = -1;
     i32 err = path_open(
-        dir->fd, 0, path.s, path.len-1, 0, WASI_FD_READ, 0, 0, &fd
+        dir->fd, 0, path.s, path.len, 0, WASI_FD_READ, 0, 0, &fd
     );
     if (err) {
         r.status = filemap_NOTFOUND;
@@ -109,18 +112,23 @@ static b32 endswith_(s8 s, s8 suffix)
 
 static s8node *os_listing(os *ctx, arena *a, s8 path)
 {
-    s8list r   = {0};
+    s8list r = {0};
 
+    path = cuttail(path, 1);  // remove null terminator
     dirfd *dir = find_dirfd(ctx, path);
     if (!dir) {
         return 0;
     }
-    path = cuthead(path, dir->path.len+1);
+    if (path.len == dir->path.len) {
+        path = S(".");
+    } else {
+        path = cuthead(path, dir->path.len+1);
+    }
 
     i32 fd  = -1;
     i32 err = path_open(
         dir->fd, 0,
-        path.s, path.len-1,
+        path.s, path.len,
         WASI_O_DIRECTORY, WASI_FD_READDIR, 0, 0, &fd
     );
     if (err) {
