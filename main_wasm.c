@@ -2,34 +2,85 @@
 
 typedef long long   i64;
 
-#define WASI(s) __attribute((import_module("wasi_unstable"), import_name(s)))
-WASI("args_get")          i32  args_get(u8 **, u8 *);
-WASI("args_sizes_get")    i32  args_sizes_get(i32 *, iz *);
-WASI("environ_get")       i32  environ_get(u8 **, u8 *);
-WASI("environ_sizes_get") i32  environ_sizes_get(i32 *, iz *);
-WASI("fd_close")          i32  fd_close(i32);
-WASI("fd_read")           i32  fd_read(i32, s8 *, iz, iz *);
-WASI("fd_readdir")        i32  fd_readdir(i32, u8 *, iz, i64, iz *);
-WASI("fd_write")          i32  fd_write(i32, s8 *, iz, iz *);
-WASI("path_open")         i32  path_open(i32,i32,u8*,iz,i32,i64,i64,i32,i32*);
-WASI("proc_exit")         void proc_exit(i32);
-
 enum {
-    WASI_FD_READ    = 1 << 1,
-    WASI_FD_READDIR = 1 << 14,
-    WASI_O_DIR      = 1 << 1,
-    WASI_PREFD      = 3,
+    WASI_FD_READ        = 1 << 1,
+    WASI_FD_READDIR     = 1 << 14,
+    WASI_O_DIRECTORY    = 1 << 1,
 };
+
+#define WASI(s) __attribute((import_module("wasi_unstable"), import_name(s)))
+WASI("args_get")            i32  args_get(u8 **, u8 *);
+WASI("args_sizes_get")      i32  args_sizes_get(i32 *, iz *);
+WASI("environ_get")         i32  environ_get(u8 **, u8 *);
+WASI("environ_sizes_get")   i32  environ_sizes_get(i32 *, iz *);
+WASI("fd_close")            i32  fd_close(i32);
+WASI("fd_prestat_dir_name") i32  fd_prestat_dir_name(i32, u8 *, iz);
+WASI("fd_prestat_get")      i32  fd_prestat_get(i32, iz *);
+WASI("fd_read")             i32  fd_read(i32, s8 *, iz, iz *);
+WASI("fd_readdir")          i32  fd_readdir(i32, u8 *, iz, i64, iz *);
+WASI("fd_write")            i32  fd_write(i32, s8 *, iz, iz *);
+WASI("path_open")           i32  path_open(i32,i32,u8*,iz,i32,i64,i64,i32,i32*);
+WASI("proc_exit")           void proc_exit(i32);
+
+typedef struct dirfd dirfd;
+struct dirfd {
+    dirfd *next;
+    s8     path;
+    i32    fd;
+};
+
+struct os {
+    dirfd *dirs;
+};
+
+static dirfd *find_preopens(arena *a)
+{
+    dirfd  *head = 0;
+    dirfd **tail = &head;
+    for (i32 fd = 3;; fd++) {
+        iz stat[2];
+        if (fd_prestat_get(fd, stat)) {
+            return head;
+        }
+
+        s8 path = {0};
+        path.len = stat[1];
+        path.s   = new(a, u8, path.len);
+        if (fd_prestat_dir_name(fd, path.s, path.len)) {
+            return head;
+        }
+
+        *tail = new(a, dirfd, 1);
+        (*tail)->path = path;
+        (*tail)->fd   = fd;
+        tail = &(*tail)->next;
+    }
+}
+
+static dirfd *find_dirfd(os *ctx, s8 path)
+{
+    for (dirfd *d = ctx->dirs; d; d = d->next) {
+        if (startswith(path, d->path)) {
+            return d;
+        }
+    }
+    return 0;
+}
 
 static filemap os_mapfile(os *ctx, arena *perm, s8 path)
 {
-    (void)ctx;
-    filemap r   = {0};
-    i32     err = 0;
+    filemap r = {0};
 
-    i32 fd;
-    err = path_open(
-        WASI_PREFD, 0, path.s, path.len-1, 0, WASI_FD_READ, 0, 0, &fd
+    dirfd *dir = find_dirfd(ctx, path);
+    if (!dir) {
+        r.status = filemap_NOTFOUND;
+        return r;
+    }
+    path = cuthead(path, dir->path.len+1);
+
+    i32 fd  = -1;
+    i32 err = path_open(
+        dir->fd, 0, path.s, path.len-1, 0, WASI_FD_READ, 0, 0, &fd
     );
     if (err) {
         r.status = filemap_NOTFOUND;
@@ -58,15 +109,19 @@ static b32 endswith_(s8 s, s8 suffix)
 
 static s8node *os_listing(os *ctx, arena *a, s8 path)
 {
-    (void)ctx;
     s8list r   = {0};
-    i32    fd  = 0;
-    i32    err = 0;
 
-    err = path_open(
-        WASI_PREFD, 0,
+    dirfd *dir = find_dirfd(ctx, path);
+    if (!dir) {
+        return 0;
+    }
+    path = cuthead(path, dir->path.len+1);
+
+    i32 fd  = -1;
+    i32 err = path_open(
+        dir->fd, 0,
         path.s, path.len-1,
-        WASI_O_DIR, WASI_FD_READDIR, 0, 0, &fd
+        WASI_O_DIRECTORY, WASI_FD_READDIR, 0, 0, &fd
     );
     if (err) {
         return 0;
@@ -130,10 +185,15 @@ static void os_fail(os *ctx)
 
 void _start(void)
 {
+    os ctx = {0};
+
     static byte heap[1<<22];
     arena perm = {0};
     perm.beg = heap;
     perm.end = heap + sizeof(heap);
+    perm.ctx = &ctx;
+
+    ctx.dirs = find_preopens(&perm);
 
     i32 argc   = 0;
     iz  buflen = 0;
