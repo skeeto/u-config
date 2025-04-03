@@ -36,6 +36,7 @@ async function uconfig_load() {
     let response = await fetch('pkg-config.wasm')
     let bytes    = await response.arrayBuffer()
     let module   = await WebAssembly.compile(bytes)
+    let prefix   = new TextEncoder().encode("/usr")
 
     function concat(bufs) {
         let total = 0
@@ -97,6 +98,20 @@ async function uconfig_load() {
                 fd_close: function(fd) {
                     file = null
                     return 0
+                },
+
+                fd_prestat_dir_name: function(fd, ptr, len) {
+                    if (fd != 3) return 8;
+                    for (let i = 0; i < prefix.length; i++) {
+                        memory.setUint8(ptr+i, prefix[i]);
+                    }
+                    return 0;
+                },
+
+                fd_prestat_get: function(fd, ptr) {
+                    if (fd != 3) return 8;
+                    memory.setInt32(ptr+0, 0,             true)
+                    memory.setInt32(ptr+4, prefix.length, true)
                 },
 
                 fd_read: function(fd, piov, count, plen) {
@@ -216,7 +231,7 @@ async function main() {
     files.addEventListener("change", function(e) {
         for (let i = 0; i < files.files.length; i++) {
             let file = files.files[i]
-            let name = "/usr/lib/pkgconfig/" + file.name
+            let name = "lib/pkgconfig/" + file.name
             let reader = new FileReader()
             reader.onload = function() {
                 filesys[name] = new Uint8Array(reader.result)
