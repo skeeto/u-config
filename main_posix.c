@@ -43,7 +43,7 @@ static void os_write(os *ctx, i32 fd, s8 s)
     (void)ctx;
     assert(fd==1 || fd==2);
     while (s.len) {
-        ssize_t r = write(fd, s.s, s.len);
+        ssize_t r = write(fd, s.s, (size_t)s.len);
         if (r < 0) {
             _exit(1);
         }
@@ -70,7 +70,7 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
     iz cap = perm->end - perm->beg;
     while (r.data.len < cap) {
         u8 *dst = r.data.s + r.data.len;
-        ssize_t len = read(fd, dst, cap-r.data.len);
+        ssize_t len = read(fd, dst, (size_t)(cap-r.data.len));
         if (len < 1) {
             break;
         }
