@@ -8,7 +8,8 @@ enum {
     WASI_O_DIRECTORY    = 1 << 1,
 };
 
-#define WASI(s) __attribute((import_module("wasi_unstable"), import_name(s)))
+#define WASI(s) \
+  __attribute((import_module("wasi_snapshot_preview1"), import_name(s)))
 WASI("args_get")            i32  args_get(u8 **, u8 *);
 WASI("args_sizes_get")      i32  args_sizes_get(i32 *, iz *);
 WASI("environ_get")         i32  environ_get(u8 **, u8 *);

@@ -69,7 +69,7 @@ async function uconfig_load() {
         }
 
         let imports = {
-            wasi_unstable: {
+            wasi_snapshot_preview1: {
                 args_get: function(argv, ptr) {
                     for (let n = 0; n < uargs.length; n++) {
                         memory.setInt32(argv + n*4, ptr, true)
