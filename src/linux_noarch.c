@@ -1,6 +1,8 @@
 // libc-free platform layer for Linux (arch-agnostic parts)
 // This is free and unencumbered software released into the public domain.
 
+#include "memory.c"
+
 #ifndef PKG_CONFIG_LIBDIR
 #  define PKG_CONFIG_LIBDIR \
      "/usr/local/lib/pkgconfig:" \

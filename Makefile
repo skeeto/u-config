@@ -24,7 +24,7 @@ default:
 	@exit 1
 
 src_windows = src/cmdline.c src/miniwin32.h src/u-config.c
-src_linux   = src/linux_noarch.c src/u-config.c
+src_linux   = src/linux_noarch.c src/memory.c src/u-config.c
 
 pkg-config.exe: main_windows.c $(src_windows)
 	$(CROSS)$(CC) $(OPT) $(WIN32_CFLAGS) -o $@ main_windows.c $(WIN32_LIBS)
