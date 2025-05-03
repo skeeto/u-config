@@ -56,6 +56,14 @@ pkg-config-linux-i686: main_linux_i686.c $(src_linux)
 pkg-config-linux-i686-debug: main_linux_i686.c $(src_linux)
 	$(CC) -nostdlib -fno-builtin $(DEBUG_CFLAGS) -o $@ main_linux_i686.c
 
+# Auto-configure using the system's pkg-config search path
+pkg-config-linux-aarch64: main_linux_aarch64.c $(src_linux)
+	$(CC) $(OPT) $(LINUX_CFLAGS) -o $@ main_linux_aarch64.c $(LINUX_LIBS) \
+	  -DPKG_CONFIG_LIBDIR="\"$$($(PC) --variable pc_path pkg-config)\""
+
+pkg-config-linux-aarch64-debug: main_linux_aarch64.c $(src_linux)
+	$(CC) -nostdlib -fno-builtin $(DEBUG_CFLAGS) -o $@ main_linux_aarch64.c
+
 # Concatenate Windows-only u-config into a single source file
 amalgamation: pkg-config.c
 pkg-config.c: main_windows.c $(src_windows)
