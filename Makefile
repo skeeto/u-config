@@ -103,6 +103,7 @@ clean:
 	      pkg-config pkg-config-debug \
 	      pkg-config-linux-amd64 pkg-config-linux-amd64-debug \
 	      pkg-config-linux-i686 pkg-config-linux-i686-debug \
+	      pkg-config-linux-aarch64 pkg-config-linux-aarch64-debug \
 	      pkg-config.c u-config-*.tar.gz \
 	      tests.exe tests pkg-config.wasm \
 	      *.ilk *.obj *.pdb main_test.exe
