@@ -18,12 +18,15 @@
 #endif
 
 // Arch-specific definitions, defined by the includer. Also requires
-// macro definitions for SYS_read, SYS_write, SYS_open, SYS_close,
+// macro definitions for SYS_read, SYS_write, SYS_openat, SYS_close,
 // SYS_exit. Arch-specific _start calls arch-agnostic entrypoint() with
 // the process entry stack pointer.
 static long syscall1(long, long);
-static long syscall2(long, long, long);
 static long syscall3(long, long, long, long);
+
+enum {
+    AT_FDCWD    = -100,
+};
 
 static void os_fail(os *ctx)
 {
@@ -54,7 +57,7 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
 
     filemap r = {0};
 
-    long fd = syscall2(SYS_open, (long)path.s, 0);
+    long fd = syscall3(SYS_openat, AT_FDCWD, (long)path.s, 0);
     if (fd < 0) {
         r.status = filemap_NOTFOUND;
         return r;
@@ -96,8 +99,7 @@ static s8node *os_listing(os *ctx, arena *a, s8 path)
     assert(!path.s[path.len-1]);
 
     // NOTE: will allocate while holding this file descriptor
-    enum { O_DIRECTORY = 0x10000 };
-    int fd = (int)syscall2(SYS_open, (long)path.s, O_DIRECTORY);
+    int fd = (int)syscall3(SYS_openat, AT_FDCWD, (long)path.s, O_DIRECTORY);
     if (fd < 0) {
         return 0;
     }

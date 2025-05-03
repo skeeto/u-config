@@ -5,10 +5,12 @@
 enum {
     SYS_close       = 6,
     SYS_exit        = 1,
-    SYS_open        = 5,
+    SYS_openat      = 295,
     SYS_read        = 3,
     SYS_write       = 4,
     SYS_getdents64  = 220,
+
+    O_DIRECTORY     = 0x10000,
 };
 
 #include "src/linux_noarch.c"
@@ -29,17 +31,6 @@ static long syscall1(long n, long a)
         : "=a"(r)
         : "a"(n), "b"(a)
         : "memory"
-    );
-    return r;
-}
-
-static long syscall2(long n, long a, long b)
-{
-    long r;
-    asm volatile (
-        "int $0x80"
-        : "=a"(r)
-        : "a"(n), "b"(a), "c"(b)
     );
     return r;
 }
