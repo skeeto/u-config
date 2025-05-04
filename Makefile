@@ -13,7 +13,8 @@ DEBUG_CFLAGS = -g3 -Wall -Wextra -Wconversion \
   -fsanitize=undefined -fsanitize-undefined-trap-on-error
 WIN32_CFLAGS = -fno-builtin -fno-asynchronous-unwind-tables
 WIN32_LIBS   = -s -nostdlib -Wl,--gc-sections -lkernel32
-LINUX_CFLAGS = -fno-builtin -fno-pie -fno-asynchronous-unwind-tables
+LINUX_CFLAGS = -fno-builtin -fno-pie -fno-lto -fcf-protection=none \
+  -fno-stack-protector -fno-asynchronous-unwind-tables
 LINUX_LIBS   = -static -s -no-pie -nostdlib -Wl,--gc-sections
 
 default:
