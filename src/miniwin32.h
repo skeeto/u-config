@@ -46,9 +46,14 @@ W32(b32)    FindNextFileW(iptr, finddata *);
 W32(c16 *)  GetCommandLineW(void);
 W32(b32)    GetConsoleMode(iptr, i32 *);
 W32(i32)    GetEnvironmentVariableW(c16 *, c16 *, i32);
-W32(i32)    GetModuleFileNameW(iptr, c16 *, i32);
 W32(iptr)   GetStdHandle(i32);
 W32(b32)    ReadFile(iptr, u8 *, i32, i32 *, uptr);
 W32(byte *) VirtualAlloc(uptr, iz, i32, i32);
 W32(b32)    WriteConsoleW(iptr, c16 *, i32, i32 *, uptr);
 W32(b32)    WriteFile(iptr, u8 *, i32, i32 *, uptr);
+W32(i32)    LdrLockLoaderLock(i32, i32 *, iz *);
+W32(i32)    LdrUnlockLoaderLock(i32, iz);
+
+/* 1 = raise on error, so these can be treated as "void" returning */
+#define LdrLockLoaderLock(a, b) ((void)LdrLockLoaderLock(1, (a), (b)))
+#define LdrUnlockLoaderLock(a) ((void)LdrUnlockLoaderLock(1, (a)))

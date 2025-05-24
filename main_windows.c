@@ -1,5 +1,6 @@
 // Mingw-w64 Win32 platform layer for u-config
-// $ cc -nostartfiles -o pkg-config main_windows.c
+// $ dlltool -d ntdll.def -l ntdll.lib
+// $ cc -nostartfiles -o pkg-config main_windows.c -L. -lntdll
 // This is free and unencumbered software released into the public domain.
 #include "src/u-config.c"
 #include "src/miniwin32.h"
@@ -259,26 +260,69 @@ static i32 truncsize(iz len)
     return len>max ? max : (i32)len;
 }
 
-static s8 installdir_(arena *perm)
+typedef struct list_entry list_entry;
+struct list_entry {
+    list_entry *flink;
+    list_entry *a;
+};
+
+typedef struct {
+    u8         a[8];
+    void      *b;
+    list_entry in_load_order_links;
+} ldr;
+
+typedef struct {
+    u8    a[4];
+    void *b;
+    void *image_base_address;
+    ldr  *ldr;
+} peb;
+
+typedef struct {
+    c16  length;
+    c16  maximum_length;
+    c16 *buffer;
+} unicode_string;
+
+typedef struct {
+    list_entry     a[3];
+    void          *image_base;
+    void          *b;
+    u32            c;
+    unicode_string full_image_name;
+} ldr_data_table_entry;
+
+static s16 procfullname_(peb *peb)
 {
-    byte *save = perm->beg;
+    i32 state = 0;
+    iz cookie = 0;
+    LdrLockLoaderLock(&state, &cookie);
+    assert(state == 1);
 
-    // GetModuleFileNameW does not communicate length. It only indicates
-    // success (buffer large enough) or failure (result truncated). To
-    // make matters worse, long paths have no fixed upper limit, though
-    // 64KiB is given as an approximate. To deal with this, offer the
-    // entire free region of the arena, far exceeding any path length.
-    //
-    // Computing sizes outside of the allocator isn't great, but the
-    // situation is constrained by this crummy API.
-    s16 exe   = {0};
-    exe.s     = (c16 *)perm->beg;
-    i32 cap   = truncsize(perm->end - perm->beg) / (i32)sizeof(c16);
-    exe.len   = GetModuleFileNameW(0, exe.s, cap);
-    perm->beg = (byte *)(exe.s + exe.len);
+    void *proc = peb->image_base_address;
+    list_entry *head = &peb->ldr->in_load_order_links;
+    list_entry *entry = head->flink;
 
-    s8 path = normalize_(fromwide_(perm, exe));
-    perm->beg = save;  // free the wide path
+    do {
+        ldr_data_table_entry *module = (void *)entry;
+        if (module->image_base == proc) {
+            LdrUnlockLoaderLock(cookie);
+
+            s16 name = {0};
+            name.s   = module->full_image_name.buffer;
+            name.len = module->full_image_name.length / 2;
+            return name;
+        }
+        entry = entry->flink;
+    } while (head != entry);
+
+    assert(0);
+}
+
+static s8 installdir_(arena *perm, peb *peb)
+{
+    s8 path = normalize_(fromwide_(perm, procfullname_(peb)));
     return dirname(dirname(path));
 }
 
@@ -313,7 +357,7 @@ static config *newconfig_(os *ctx)
 }
 
 __attribute((force_align_arg_pointer))
-void mainCRTStartup(void)
+void mainCRTStartup(peb *peb)
 {
     os ctx[1] = {0};
     i32 dummy;
@@ -332,7 +376,7 @@ void mainCRTStartup(void)
     conf->nargs = cmdline_to_argv8(cmdline, argv) - 1;
     conf->args = argv + 1;
 
-    s8 base  = installdir_(perm);
+    s8 base  = installdir_(perm, peb);
     s8 lib   = S(PKG_CONFIG_PREFIX "/lib/pkgconfig");
     s8 share = S(PKG_CONFIG_PREFIX "/share/pkgconfig");
     conf->pc_path = makepath_(perm, base, lib, share);
