@@ -1,5 +1,6 @@
 // Mingw-w64 Win32 platform layer for u-config
-// $ cc -nostartfiles -o pkg-config main_windows.c
+// $ dlltool -d ntdll.def -l ntdll.lib
+// $ cc -nostartfiles -o pkg-config main_windows.c -L. -lntdll
 // This is free and unencumbered software released into the public domain.
 #include "src/u-config.c"
 #include "src/miniwin32.h"
@@ -294,13 +295,20 @@ typedef struct {
 
 static s16 procfullname_(peb *peb)
 {
+    i32 state = 0;
+    iz cookie = 0;
+    LdrLockLoaderLock(&state, &cookie);
+    assert(state == 1);
+
     void *proc = peb->image_base_address;
     list_entry *head = &peb->ldr->in_load_order_links;
     list_entry *entry = head->flink;
 
     do {
-        ldr_data_table_entry *module = (void*)entry;
+        ldr_data_table_entry *module = (void *)entry;
         if (module->image_base == proc) {
+            LdrUnlockLoaderLock(cookie);
+
             s16 name = {0};
             name.s   = module->full_image_name.buffer;
             name.len = module->full_image_name.length / 2;
