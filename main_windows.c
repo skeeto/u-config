@@ -1,6 +1,5 @@
 // Mingw-w64 Win32 platform layer for u-config
-// $ dlltool -d ntdll.def -l ntdll.lib
-// $ cc -nostartfiles -o pkg-config main_windows.c -L. -lntdll
+// $ cc -nostartfiles -o pkg-config main_windows.c
 // This is free and unencumbered software released into the public domain.
 #include "src/u-config.c"
 #include "src/miniwin32.h"
@@ -269,7 +268,8 @@ struct list_entry {
 typedef struct {
     u8         a[8];
     void      *b;
-    list_entry in_load_order_links;
+    list_entry c;
+    list_entry in_memory_order_links;
 } ldr;
 
 typedef struct {
@@ -286,43 +286,25 @@ typedef struct {
 } unicode_string;
 
 typedef struct {
-    list_entry     a[3];
+    list_entry     a;
+    list_entry     in_memory_order_link;
+    list_entry     b;
     void          *image_base;
-    void          *b;
-    u32            c;
+    void          *c;
+    u32            d;
     unicode_string full_image_name;
 } ldr_data_table_entry;
 
-static s16 procfullname_(peb *peb)
-{
-    i32 state = 0;
-    iz cookie = 0;
-    LdrLockLoaderLock(&state, &cookie);
-    assert(state == 1);
-
-    void *proc = peb->image_base_address;
-    list_entry *head = &peb->ldr->in_load_order_links;
-    list_entry *entry = head->flink;
-
-    do {
-        ldr_data_table_entry *module = (void *)entry;
-        if (module->image_base == proc) {
-            LdrUnlockLoaderLock(cookie);
-
-            s16 name = {0};
-            name.s   = module->full_image_name.buffer;
-            name.len = module->full_image_name.length / 2;
-            return name;
-        }
-        entry = entry->flink;
-    } while (head != entry);
-
-    assert(0);
-}
-
 static s8 installdir_(arena *perm, peb *peb)
 {
-    s8 path = normalize_(fromwide_(perm, procfullname_(peb)));
+    list_entry *entry = &*peb->ldr->in_memory_order_links.flink;
+    ldr_data_table_entry *ldr_entry =
+        containerof(entry, ldr_data_table_entry, in_memory_order_link);
+    assert(ldr_entry->image_base == peb->image_base_address);
+    s16 name = {0};
+    name.s   = ldr_entry->full_image_name.buffer;
+    name.len = ldr_entry->full_image_name.length / 2;
+    s8 path = normalize_(fromwide_(perm, name));
     return dirname(dirname(path));
 }
 

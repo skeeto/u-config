@@ -72,12 +72,10 @@ general, u-config correctly processes paths with spaces, a feature that is
 especially important on Windows. Do not link a C runtime (CRT) in this
 configuration:
 
-    $ dlltool -d ntdll.def -l ntdll.lib
-    $ cc -Os -nostartfiles -o pkg-config main_windows.c -L. -lntdll
+    $ cc -Os -nostartfiles -o pkg-config main_windows.c
 
 Or with MSVC:
 
-    $ lib /def:ntdll.def /out:ntdll.lib
     $ cl /GS- /O2 /Os /Fe:pkg-config main_msvc.c
 
 Or a WebAssembly (WASI) build:

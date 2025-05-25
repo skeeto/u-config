@@ -4,17 +4,15 @@
 # the appropriate main_*.c source. See "Build" in README.md for more
 # information, and "Configuration" for a list of configuration options.
 
-CROSS   = x86_64-w64-mingw32-
-CC      = gcc
-DLLTOOL = dlltool
-OPT     = -Os
-PC      = pkg-config  # e.g. for CROSS-pkg-config
+CROSS = x86_64-w64-mingw32-
+CC    = gcc
+OPT   = -Os
+PC    = pkg-config  # e.g. for CROSS-pkg-config
 
 DEBUG_CFLAGS = -g3 -Wall -Wextra -Wconversion \
   -fsanitize=undefined -fsanitize-undefined-trap-on-error
 WIN32_CFLAGS = -fno-builtin -fno-asynchronous-unwind-tables
-NTDLL_LIB    = -L. -lntdll
-WIN32_LIBS   = -s -nostdlib -Wl,--gc-sections -lkernel32 $(NTDLL_LIB)
+WIN32_LIBS   = -s -nostdlib -Wl,--gc-sections -lkernel32
 LINUX_CFLAGS = -fno-builtin -fno-pie -fno-lto -fcf-protection=none \
   -fno-stack-protector -fno-asynchronous-unwind-tables
 LINUX_LIBS   = -static -s -no-pie -nostdlib -Wl,--gc-sections
@@ -29,14 +27,11 @@ default:
 src_windows = src/cmdline.c src/miniwin32.h src/u-config.c
 src_linux   = src/linux_noarch.c src/memory.c src/u-config.c
 
-ntdll.lib: ntdll.def
-	$(CROSS)$(DLLTOOL) -d ntdll.def -l $@
-
-pkg-config.exe: ntdll.lib main_windows.c $(src_windows)
+pkg-config.exe: main_windows.c $(src_windows)
 	$(CROSS)$(CC) $(OPT) $(WIN32_CFLAGS) -o $@ main_windows.c $(WIN32_LIBS)
 
-pkg-config-debug.exe: ntdll.lib main_windows.c $(src_windows)
-	$(CROSS)$(CC) -nostartfiles $(DEBUG_CFLAGS) -o $@ main_windows.c $(NTDLL_LIB)
+pkg-config-debug.exe: main_windows.c $(src_windows)
+	$(CROSS)$(CC) -nostartfiles $(DEBUG_CFLAGS) -o $@ main_windows.c
 
 # Auto-configure using the system's pkg-config search path
 pkg-config: main_posix.c src/u-config.c
@@ -112,5 +107,4 @@ clean:
 	      pkg-config-linux-aarch64 pkg-config-linux-aarch64-debug \
 	      pkg-config.c u-config-*.tar.gz \
 	      tests.exe tests pkg-config.wasm \
-	      ntdll.lib ntdll.exp \
 	      *.ilk *.obj *.pdb main_test.exe

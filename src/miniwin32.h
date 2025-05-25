@@ -1,6 +1,9 @@
 // Win32 types, constants, and declarations (replaces windows.h)
 // This is free and unencumbered software released into the public domain.
 
+#define containerof(ptr, type, member) \
+    ((type *)((unsigned char *)(ptr) - offsetof(type, member)))
+
 typedef ptrdiff_t       iptr;
 typedef size_t          uptr;
 typedef unsigned short  char16_t;
@@ -51,9 +54,3 @@ W32(b32)    ReadFile(iptr, u8 *, i32, i32 *, uptr);
 W32(byte *) VirtualAlloc(uptr, iz, i32, i32);
 W32(b32)    WriteConsoleW(iptr, c16 *, i32, i32 *, uptr);
 W32(b32)    WriteFile(iptr, u8 *, i32, i32 *, uptr);
-W32(i32)    LdrLockLoaderLock(i32, i32 *, iz *);
-W32(i32)    LdrUnlockLoaderLock(i32, iz);
-
-/* 1 = raise on error, so these can be treated as "void" returning */
-#define LdrLockLoaderLock(a, b) ((void)LdrLockLoaderLock(1, (a), (b)))
-#define LdrUnlockLoaderLock(a) ((void)LdrUnlockLoaderLock(1, (a)))

@@ -1,5 +1,0 @@
-LIBRARY ntdll
-
-EXPORTS
-  LdrLockLoaderLock
-  LdrUnlockLoaderLock

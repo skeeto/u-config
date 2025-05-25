@@ -4,7 +4,6 @@
 #pragma comment(linker, "/subsystem:console")
 #pragma comment(lib, "libvcruntime.lib")
 #pragma comment(lib, "kernel32.lib")
-#pragma comment(lib, "ntdll.lib")
 
 #define __builtin_unreachable()  __assume(0)
 #define __attribute(x)
