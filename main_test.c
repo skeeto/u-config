@@ -634,7 +634,7 @@ static void test_sysrootdir(arena a)
     // pkgconf, both of which have fundamentally flawed behavior, though
     // pkg-config is closer to being correct. Only -I and -L of packages
     // discovered under the "fake" sysroot are affected, e.g. libbar.
-    config conf = newtest_(a, S("exclude syspaths"));
+    config conf = newtest_(a, S("pc_sysrootdir"));
     conf.envpath = S("/tmp/usr/lib/pkgconfig");
     conf.sysrootdir = S("/tmp");  // i.e. DESTDIR=/tmp
     newfile_(&conf, S("/usr/lib/pkgconfig/foo.pc"), S(
