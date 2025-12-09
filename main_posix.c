@@ -89,11 +89,6 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
     return r;
 }
 
-static b32 endswith_(s8 s, s8 suffix)
-{
-    return s.len>=suffix.len && s8equals(taketail(s, suffix.len), suffix);
-}
-
 static s8node *os_listing(os *ctx, arena *a, s8 path)
 {
     (void)ctx;
@@ -110,7 +105,7 @@ static s8node *os_listing(os *ctx, arena *a, s8 path)
     s8list files = {0};
     for (struct dirent *d; (d = readdir(handle));) {
         s8 name = s8fromcstr((u8 *)d->d_name);
-        if (endswith_(name, S(".pc"))) {
+        if (endswith(name, S(".pc"))) {
             s8 copy = news8(a, name.len);
             s8copy(copy, name);
             append(&files, copy, a);
@@ -177,6 +172,7 @@ int main(int argc, char **argv)
         conf->sys_libpath = S(PKG_CONFIG_SYSTEM_LIBRARY_PATH);
     }
     conf->top_builddir = s8getenv_("PKG_CONFIG_TOP_BUILD_DIR");
+    conf->sysrootdir   = s8getenv_("PKG_CONFIG_SYSROOT_DIR");
     conf->print_sysinc = s8getenv_("PKG_CONFIG_ALLOW_SYSTEM_CFLAGS");
     conf->print_syslib = s8getenv_("PKG_CONFIG_ALLOW_SYSTEM_LIBS");
 

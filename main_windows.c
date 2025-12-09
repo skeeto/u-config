@@ -346,6 +346,7 @@ void mainCRTStartup(void)
     conf->top_builddir = fromenv_(perm, L"PKG_CONFIG_TOP_BUILD_DIR");
     conf->sys_incpath  = conf->pc_sysincpath;
     conf->sys_libpath  = conf->pc_syslibpath;
+    conf->sysrootdir   = fromenv_(perm, L"PKG_CONFIG_SYSROOT_DIR");
     conf->print_sysinc = fromenv_(perm, L"PKG_CONFIG_ALLOW_SYSTEM_CFLAGS");
     conf->print_syslib = fromenv_(perm, L"PKG_CONFIG_ALLOW_SYSTEM_LIBS");
 

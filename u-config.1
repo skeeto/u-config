@@ -58,6 +58,9 @@ supports all the important pkg-config run-time environment variables. To see
 which are supported, use the
 .Fl \-help
 option.
+One important difference:
+.Ev PKG_CONFIG_SYSROOT_DIR
+only affects -I and -L flags, and only for .pc files found under that path.
 .
 .Sh EXAMPLES
 .Bd -literal
