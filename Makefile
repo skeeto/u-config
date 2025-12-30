@@ -86,7 +86,7 @@ tests: main_test.c src/u-config.c
 	$(CC) $(DEBUG_CFLAGS) -Wno-clobbered -o $@ main_test.c
 
 pkg-config.wasm: main_wasm.c src/u-config.c
-	clang --target=wasm32 -nostdlib -Os -mbulk-memory \
+	clang --target=wasm32 -nostdlib -Os -fno-builtin -mbulk-memory \
 	      -Wall -Wextra -Wconversion -Wno-unused-parameter \
 	      -s -Wl,--stack-first -o $@ main_wasm.c
 
