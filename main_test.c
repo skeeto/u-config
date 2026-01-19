@@ -613,6 +613,81 @@ static void test_syspaths(arena a)
     EXPECT("-DEXAMPLE -L/usr/lib -lexample\n");
 }
 
+static void test_sysrootdir(arena a)
+{
+    // Scenario: a package is half-installed into a DESTDIR
+    // Expect: -I and -L adjusted, other path prefixes untouched
+    //
+    // This exists to support cross-compilation. Dependencies are never
+    // to be installed on the build system, but must still be available
+    // as dependencies in their temporary DESTDIR. The same .pc files
+    // will be used by the cross toolchain (now) and native toolchain
+    // (later). The cross build system sets PKG_CONFIG_SYSROOT_DIR to
+    // direct pkg-config to modify -I and -L from DESTDIR-located
+    // packages to match the current, temporary reality.
+    //
+    // If a package came from DESTDIR, it matters not how its -I or -L
+    // are constructed, whether hardcoded or derived from ${prefix}. If
+    // it's an absolute path then it requires modification.
+    //
+    // The expected output matches neither the original pkg-config nor
+    // pkgconf, both of which have fundamentally flawed behavior, though
+    // pkg-config is closer to being correct. Only -I and -L of packages
+    // discovered under the "fake" sysroot are affected, e.g. libbar.
+    config conf = newtest_(a, S("pc_sysrootdir"));
+    conf.envpath = S("/tmp/usr/lib/pkgconfig");
+    conf.sysrootdir = S("/tmp");  // i.e. DESTDIR=/tmp
+    newfile_(&conf, S("/usr/lib/pkgconfig/foo.pc"), S(
+        PCHDR
+        "prefix=/usr\n"
+        "Cflags: -DFOO=${prefix}/share/foo -I${prefix}/include\n"
+        "Libs: -L${prefix}/lib -lfoo\n"
+    ));
+    newfile_(&conf, S("/tmp/usr/lib/pkgconfig/bar.pc"), S(
+        PCHDR
+        "prefix=/usr\n"
+        "Cflags: -DBAR=${prefix}/share/bar -I${prefix}/include\n"
+        "Libs: -L${prefix}/lib -lbar\n"
+    ));
+
+    SHOULDPASS {
+        run(conf, S("--variable"), S("pc_sysrootdir"), S("pkg-config"), E);
+    }
+    EXPECT("/\n");  // not under $PKG_CONFIG_SYSROOT_DIR
+
+    SHOULDPASS {
+        run(conf, S("--variable"), S("pc_sysrootdir"), S("foo"), E);
+    }
+    EXPECT("/\n");  // not under $PKG_CONFIG_SYSROOT_DIR
+
+    SHOULDPASS {
+        run(
+            conf,
+            S("--variable"), S("pc_sysrootdir"),
+            // NOTE: pkgconf modifies absolute path arguments, too, and
+            // so fails to find bar.pc in this scenario.
+            S("/tmp/usr/lib/pkgconfig/bar.pc"),
+            E
+        );
+    }
+    EXPECT("/tmp\n");
+
+    // The build system adds DESTDIR to PKG_CONFIG_PATH because needed
+    // .pc files are located there, then sets PKG_CONFIG_SYSROOT_DIR to
+    // adjust the -I and -L flags produced by DESTDIR-located packages.
+    // Because libfoo is installed, not in DESTDIR, it is unaffected by
+    // this configuration, but libbar -I and -L are affected. Hard-coded
+    // paths to data are unaffected, because they used at run-time, not
+    // while the program is still located in the DESTDIR.
+    SHOULDPASS {
+        run(conf, S("--cflags"), S("--libs"), S("foo"), S("bar"), E);
+    }
+    EXPECT(
+        "-DFOO=/usr/share/foo -DBAR=/usr/share/bar -I/tmp/usr/include "
+        "-lfoo -L/tmp/usr/lib -lbar\n"
+    );
+}
+
 static void test_libsorder(arena a)
 {
     // Scenario: two packages link a common library
@@ -1017,6 +1092,7 @@ int main(void)
     test_private_transitive(a);
     test_revealed_transitive(a);
     test_syspaths(a);
+    test_sysrootdir(a);
     test_libsorder(a);
     test_staticorder(a);
     test_windows(a);

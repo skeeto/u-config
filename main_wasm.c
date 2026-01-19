@@ -274,6 +274,8 @@ void _start(void)
             conf.sys_incpath = value;
         } else if (s8equals(name, S("PKG_CONFIG_SYSTEM_LIBRARY_PATH"))) {
             conf.sys_libpath = value;
+        } else if (s8equals(name, S("PKG_CONFIG_SYSROOT_DIR"))) {
+            conf.sysrootdir = value;
         } else if (s8equals(name, S("PKG_CONFIG_ALLOW_SYSTEM_CFLAGS"))) {
             conf.print_sysinc = value;
         } else if (s8equals(name, S("PKG_CONFIG_ALLOW_SYSTEM_LIBS"))) {

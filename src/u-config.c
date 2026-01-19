@@ -48,6 +48,7 @@ typedef struct {
     s8    top_builddir;  // $PKG_CONFIG_TOP_BUILD_DIR or default
     s8    sys_incpath;   // $PKG_CONFIG_SYSTEM_INCLUDE_PATH or default
     s8    sys_libpath;   // $PKG_CONFIG_SYSTEM_LIBRARY_PATH or default
+    s8    sysrootdir;    // $PKG_CONFIG_SYSROOT_DIR or empty
     s8    print_sysinc;  // $PKG_CONFIG_ALLOW_SYSTEM_CFLAGS or empty
     s8    print_syslib;  // $PKG_CONFIG_ALLOW_SYSTEM_LIBS or empty
     b32   define_prefix;
@@ -229,6 +230,19 @@ static s8 taketail(s8 s, iz len)
 static b32 startswith(s8 s, s8 prefix)
 {
     return s.len>=prefix.len && s8equals(takehead(s, prefix.len), prefix);
+}
+
+static b32 endswith(s8 s, s8 suffix)
+{
+    return s.len>=suffix.len && s8equals(taketail(s, suffix.len), suffix);
+}
+
+static s8 trimend(s8 s, u8 c)
+{
+    while (s.len && s.s[s.len-1]==c) {
+        s = cuttail(s, 1);
+    }
+    return s;
 }
 
 static u32 s8hash(s8 s)
@@ -568,7 +582,7 @@ struct pkgspec {
     s8       version;
 };
 
-enum { pkg_DIRECT=1<<0, pkg_PUBLIC=1<<1 };
+enum { pkg_DIRECT=1<<0, pkg_PUBLIC=1<<1, pkg_DESTDIR=1<<2 };
 
 typedef struct pkg pkg;
 struct pkg {
@@ -997,6 +1011,7 @@ static void usage(u8buf *b)
     "  PKG_CONFIG_TOP_BUILD_DIR\n"
     "  PKG_CONFIG_SYSTEM_INCLUDE_PATH\n"
     "  PKG_CONFIG_SYSTEM_LIBRARY_PATH\n"
+    "  PKG_CONFIG_SYSROOT_DIR\n"
     "  PKG_CONFIG_ALLOW_SYSTEM_CFLAGS\n"
     "  PKG_CONFIG_ALLOW_SYSTEM_LIBS\n";
     prints8(b, S(usage));
@@ -1020,12 +1035,14 @@ static void append(s8list *list, s8 str, arena *perm)
 
 typedef struct {
     s8list list;
+    s8     sysrootdir;
     u8     delim;
 } search;
 
-static search newsearch(u8 delim)
+static search newsearch(u8 delim, s8 sysrootdir)
 {
     search r = {0};
+    r.sysrootdir = trimend(sysrootdir, '/');
     r.delim = delim;
     return r;
 }
@@ -1049,7 +1066,7 @@ static void prependpath(search *dirs, s8 path, arena *perm)
         appendpath(dirs, path, perm);
     } else {
         // Append to an empty Search, then transplant in front
-        search temp = newsearch(dirs->delim);
+        search temp = newsearch(dirs->delim, dirs->sysrootdir);
         appendpath(&temp, path, perm);
         *temp.list.tail = dirs->list.head;
         dirs->list.head = temp.list.head;
@@ -1058,7 +1075,7 @@ static void prependpath(search *dirs, s8 path, arena *perm)
 
 static b32 realnameispath(s8 realname)
 {
-    return realname.len>3 && s8equals(taketail(realname, 3), S(".pc"));
+    return endswith(realname, S(".pc"));
 }
 
 static s8 pathtorealname(s8 path)
@@ -1197,7 +1214,10 @@ static pkg findpackage(search *dirs, u8buf *err, s8 realname, arena *perm)
     s8 path = {0};
     s8 contents = {0};
 
-    if (realnameispath(realname)) {
+    if (s8equals(realname, S("pkg-config"))) {
+        contents = readpackage(err, path, realname, perm);
+        path = S("pkg-config.pc");
+    } else if (realnameispath(realname)) {
         path = news8(perm, realname.len+1);
         s8copy(path, realname).s[0] = 0;
         contents = readpackage(err, path, realname, perm);
@@ -1251,6 +1271,13 @@ static pkg findpackage(search *dirs, u8buf *err, s8 realname, arena *perm)
     r.pkg.realname = realname;
     s8 pcfiledir = s8pathencode(dirname(path), perm);
     *insert(&r.pkg.env, S("pcfiledir"), perm) = pcfiledir;
+
+    s8 pc_sysrootdir = S("/");
+    if (dirs->sysrootdir.len && startswith(path, dirs->sysrootdir)) {
+        pc_sysrootdir = s8pathencode(dirs->sysrootdir, perm);
+        r.pkg.flags |= pkg_DESTDIR;
+    }
+    *insert(&r.pkg.env, S("pc_sysrootdir"), perm) = pc_sysrootdir;
 
     s8 missing = {0};
     if (!r.pkg.name.s) {
@@ -1439,7 +1466,7 @@ static processor *newprocessor(config *c, u8buf *err, env **g)
     arena *perm = &c->perm;
     processor *proc = new(perm, processor, 1);
     proc->err = err;
-    proc->search = newsearch(c->delim);
+    proc->search = newsearch(c->delim, c->sysrootdir);
     appendpath(&proc->search, c->envpath, perm);
     appendpath(&proc->search, c->fixedpath, perm);
     proc->global = g;
@@ -1699,17 +1726,20 @@ typedef struct {
     arena *perm;
     iz    *argcount;
     args   args;
+    s8     sysrootdir;
     filter filter;
     b32    msvc;
     u8     delim;
 } fieldwriter;
 
-static fieldwriter newfieldwriter(filter f, iz *argcount, arena *perm)
+static fieldwriter newfieldwriter(
+    filter f, iz *argcount, s8 sysrootdir, arena *perm)
 {
     fieldwriter w = {0};
     w.perm = perm;
     w.filter = f;
     w.argcount = argcount;
+    w.sysrootdir = trimend(sysrootdir, '/');
     return w;
 }
 
@@ -1753,6 +1783,25 @@ static void insertsyspath(fieldwriter *w, s8 path, u8 delim, u8 flag)
     }
 }
 
+static s8 prepend_sysrootdir(s8 arg, s8 sysrootdir, arena *perm)
+{
+    if (!startswith(arg, S("-I")) && !startswith(arg, S("-L"))) {
+        return arg;
+    }
+
+    // NOTE: This will be incorrect for relative paths, e.g. "-I.", but
+    // relative paths make no sense in pkg-config output. Users of those
+    // arguments have multiple and unknown working paths.
+
+    s8 flag = takehead(arg, 2);
+    s8 path = cuthead(arg, 2);
+    arg = news8(perm, flag.len+sysrootdir.len+path.len);
+    s8 p = s8copy(arg, flag);
+       p = s8copy(p, sysrootdir);
+           s8copy(p, path);
+    return arg;
+}
+
 static void appendfield(u8buf *err, fieldwriter *w, pkg *p, s8 field)
 {
     arena *perm = w->perm;
@@ -1768,6 +1817,9 @@ static void appendfield(u8buf *err, fieldwriter *w, pkg *p, s8 field)
             os_fail(err->ctx);
         }
         if (filterok(f, r.arg)) {
+            if (p->flags & pkg_DESTDIR) {
+                r.arg = prepend_sysrootdir(r.arg, w->sysrootdir, w->perm);
+            }
             appendarg(&w->args, r.arg, perm);
         }
         field = r.tail;
@@ -1895,7 +1947,6 @@ static void uconfig(config *conf)
     *insert(&global, S("pc_path"), perm) = conf->pc_path;
     *insert(&global, S("pc_system_includedirs"), perm) = conf->pc_sysincpath;
     *insert(&global, S("pc_system_libdirs"), perm) = conf->pc_syslibpath;
-    *insert(&global, S("pc_sysrootdir"), perm) = S("/");
     *insert(&global, S("pc_top_builddir"), perm) = top_builddir;
 
     s8 *origargs = new(perm, s8, conf->nargs);
@@ -2157,7 +2208,9 @@ static void uconfig(config *conf)
 
     if (cflags) {
         arena scratch = *perm;
-        fieldwriter fw = newfieldwriter(filterc, &argcount, &scratch);
+        fieldwriter fw = newfieldwriter(
+            filterc, &argcount, conf->sysrootdir, &scratch
+        );
         fw.delim = argdelim;
         fw.msvc = msvc;
         if (!print_sysinc) {
@@ -2174,7 +2227,9 @@ static void uconfig(config *conf)
 
     if (libs) {
         arena scratch = *perm;
-        fieldwriter fw = newfieldwriter(filterl, &argcount, &scratch);
+        fieldwriter fw = newfieldwriter(
+            filterl, &argcount, conf->sysrootdir, &scratch
+        );
         fw.delim = argdelim;
         fw.msvc = msvc;
         if (!print_syslib) {
