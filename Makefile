@@ -65,6 +65,14 @@ pkg-config-linux-aarch64: main_linux_aarch64.c $(src_linux)
 pkg-config-linux-aarch64-debug: main_linux_aarch64.c $(src_linux)
 	$(CC) -nostdlib -fno-builtin $(DEBUG_CFLAGS) -o $@ main_linux_aarch64.c
 
+# Auto-configure using the system's pkg-config search path
+pkg-config-linux-riscv64: main_linux_riscv64.c $(src_linux)
+	$(CC) $(OPT) $(LINUX_CFLAGS) -o $@ main_linux_riscv64.c $(LINUX_LIBS) \
+	  -DPKG_CONFIG_LIBDIR="\"$$($(PC) --variable pc_path pkg-config)\""
+
+pkg-config-linux-riscv64-debug: main_linux_riscv64.c $(src_linux)
+	$(CC) -nostdlib -fno-builtin $(DEBUG_CFLAGS) -o $@ main_linux_riscv64.c
+
 # Concatenate Windows-only u-config into a single source file
 amalgamation: pkg-config.c
 pkg-config.c: main_windows.c $(src_windows)
@@ -105,6 +113,7 @@ clean:
 	      pkg-config-linux-amd64 pkg-config-linux-amd64-debug \
 	      pkg-config-linux-i686 pkg-config-linux-i686-debug \
 	      pkg-config-linux-aarch64 pkg-config-linux-aarch64-debug \
+	      pkg-config-linux-riscv64 pkg-config-linux-riscv64-debug \
 	      pkg-config.c u-config-*.tar.gz \
 	      tests.exe tests pkg-config.wasm \
 	      *.ilk *.obj *.pdb main_test.exe
