@@ -1,6 +1,7 @@
 // u-config: a small, simple, portable pkg-config clone
 // https://github.com/skeeto/u-config
 // This is free and unencumbered software released into the public domain.
+#pragma once
 #include <stddef.h>
 #define VERSION "0.34.0"
 

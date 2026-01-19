@@ -23,8 +23,8 @@
 // macro definitions for SYS_read, SYS_write, SYS_openat, SYS_close,
 // SYS_exit. Arch-specific _start calls arch-agnostic entrypoint() with
 // the process entry stack pointer.
-static long syscall1(long, long);
-static long syscall3(long, long, long, long);
+static iz syscall1(iz, iz);
+static iz syscall3(iz, iz, iz, iz);
 
 enum {
     AT_FDCWD    = -100,
@@ -42,7 +42,7 @@ static void os_write(os *ctx, i32 fd, s8 s)
     (void)ctx;
     assert(fd==1 || fd==2);
     while (s.len) {
-        long r = syscall3(SYS_write, fd, (long)s.s, s.len);
+        iz r = syscall3(SYS_write, fd, (iz)s.s, s.len);
         if (r < 0) {
             os_fail(0);
         }
@@ -59,7 +59,7 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
 
     filemap r = {0};
 
-    long fd = syscall3(SYS_openat, AT_FDCWD, (long)path.s, 0);
+    iz fd = syscall3(SYS_openat, AT_FDCWD, (iz)path.s, 0);
     if (fd < 0) {
         r.status = filemap_NOTFOUND;
         return r;
@@ -69,7 +69,7 @@ static filemap os_mapfile(os *ctx, arena *perm, s8 path)
     iz cap = perm->end - perm->beg;
     while (r.data.len < cap) {
         u8 *dst = r.data.s + r.data.len;
-        long len = syscall3(SYS_read, fd, (long)dst, cap-r.data.len);
+        iz len = syscall3(SYS_read, fd, (iz)dst, cap-r.data.len);
         if (len < 1) {
             break;
         }
@@ -101,7 +101,7 @@ static s8node *os_listing(os *ctx, arena *a, s8 path)
     assert(!path.s[path.len-1]);
 
     // NOTE: will allocate while holding this file descriptor
-    int fd = (int)syscall3(SYS_openat, AT_FDCWD, (long)path.s, O_DIRECTORY);
+    int fd = (int)syscall3(SYS_openat, AT_FDCWD, (iz)path.s, O_DIRECTORY);
     if (fd < 0) {
         return 0;
     }
@@ -110,7 +110,7 @@ static s8node *os_listing(os *ctx, arena *a, s8 path)
     byte  *buf   = new(a, byte, cap);
     s8list files = {0};
     for (;;) {
-        iz len = syscall3(SYS_getdents64, fd, (long)buf, cap);
+        iz len = syscall3(SYS_getdents64, fd, (iz)buf, cap);
         if (len < 1) {
             break;
         }
@@ -200,7 +200,7 @@ static i32 os_main(i32 argc, u8 **argv, u8 **envp)
     return 0;
 }
 
-void entrypoint(long *stack)
+void entrypoint(iz *stack)
 {
     i32  argc   = (i32)stack[0];
     u8 **argv   = (u8 **)stack + 1;

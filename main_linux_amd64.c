@@ -21,9 +21,9 @@ asm (
     "        call  entrypoint\n"
 );
 
-static long syscall1(long n, long a)
+static iz syscall1(iz n, iz a)
 {
-    long r;
+    iz r;
     asm volatile (
         "syscall"
         : "=a"(r)
@@ -33,9 +33,9 @@ static long syscall1(long n, long a)
     return r;
 }
 
-static long syscall3(long n, long a, long b, long c)
+static iz syscall3(iz n, iz a, iz b, iz c)
 {
-    long r;
+    iz r;
     asm volatile (
         "syscall"
         : "=a"(r)
