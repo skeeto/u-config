@@ -259,26 +259,52 @@ static i32 truncsize(iz len)
     return len>max ? max : (i32)len;
 }
 
-static s8 installdir_(arena *perm)
+typedef struct list_entry list_entry;
+struct list_entry {
+    list_entry *flink;
+    list_entry *a;
+};
+
+typedef struct {
+    u8         a[8];
+    void      *b;
+    list_entry c;
+    list_entry in_memory_order_links;
+} ldr;
+
+typedef struct {
+    u8    a[4];
+    void *b;
+    void *image_base_address;
+    ldr  *ldr;
+} peb;
+
+typedef struct {
+    c16  length;
+    c16  maximum_length;
+    c16 *buffer;
+} unicode_string;
+
+typedef struct {
+    list_entry     a;
+    list_entry     in_memory_order_link;
+    list_entry     b;
+    void          *image_base;
+    void          *c;
+    u32            d;
+    unicode_string full_image_name;
+} ldr_data_table_entry;
+
+static s8 installdir_(arena *perm, peb *peb)
 {
-    byte *save = perm->beg;
-
-    // GetModuleFileNameW does not communicate length. It only indicates
-    // success (buffer large enough) or failure (result truncated). To
-    // make matters worse, long paths have no fixed upper limit, though
-    // 64KiB is given as an approximate. To deal with this, offer the
-    // entire free region of the arena, far exceeding any path length.
-    //
-    // Computing sizes outside of the allocator isn't great, but the
-    // situation is constrained by this crummy API.
-    s16 exe   = {0};
-    exe.s     = (c16 *)perm->beg;
-    i32 cap   = truncsize(perm->end - perm->beg) / (i32)sizeof(c16);
-    exe.len   = GetModuleFileNameW(0, exe.s, cap);
-    perm->beg = (byte *)(exe.s + exe.len);
-
-    s8 path = normalize_(fromwide_(perm, exe));
-    perm->beg = save;  // free the wide path
+    list_entry *entry = &*peb->ldr->in_memory_order_links.flink;
+    ldr_data_table_entry *ldr_entry =
+        containerof(entry, ldr_data_table_entry, in_memory_order_link);
+    assert(ldr_entry->image_base == peb->image_base_address);
+    s16 name = {0};
+    name.s   = ldr_entry->full_image_name.buffer;
+    name.len = ldr_entry->full_image_name.length / 2;
+    s8 path = normalize_(fromwide_(perm, name));
     return dirname(dirname(path));
 }
 
@@ -313,7 +339,7 @@ static config *newconfig_(os *ctx)
 }
 
 __attribute((force_align_arg_pointer))
-void mainCRTStartup(void)
+void mainCRTStartup(peb *peb)
 {
     os ctx[1] = {0};
     i32 dummy;
@@ -332,7 +358,7 @@ void mainCRTStartup(void)
     conf->nargs = cmdline_to_argv8(cmdline, argv) - 1;
     conf->args = argv + 1;
 
-    s8 base  = installdir_(perm);
+    s8 base  = installdir_(perm, peb);
     s8 lib   = S(PKG_CONFIG_PREFIX "/lib/pkgconfig");
     s8 share = S(PKG_CONFIG_PREFIX "/share/pkgconfig");
     conf->pc_path = makepath_(perm, base, lib, share);

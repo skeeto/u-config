@@ -1,6 +1,9 @@
 // Win32 types, constants, and declarations (replaces windows.h)
 // This is free and unencumbered software released into the public domain.
 
+#define containerof(ptr, type, member) \
+    ((type *)((unsigned char *)(ptr) - offsetof(type, member)))
+
 typedef ptrdiff_t       iptr;
 typedef size_t          uptr;
 typedef unsigned short  char16_t;
@@ -46,7 +49,6 @@ W32(b32)    FindNextFileW(iptr, finddata *);
 W32(c16 *)  GetCommandLineW(void);
 W32(b32)    GetConsoleMode(iptr, i32 *);
 W32(i32)    GetEnvironmentVariableW(c16 *, c16 *, i32);
-W32(i32)    GetModuleFileNameW(iptr, c16 *, i32);
 W32(iptr)   GetStdHandle(i32);
 W32(b32)    ReadFile(iptr, u8 *, i32, i32 *, uptr);
 W32(byte *) VirtualAlloc(uptr, iz, i32, i32);
