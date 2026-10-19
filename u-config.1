@@ -1,79 +1,77 @@
-.Dd 2024-08-22
-.Dt U-CONFIG 1
-.Os
+.TH U-CONFIG 1 2024-08-22 u-config
 .
-.Sh NAME
-.Nm u-config
-.Nd smaller, simpler, portable pkg-config clone
+.SH NAME
+u-config \- smaller, simpler, portable pkg-config clone
 .
-.Sh SYNOPSIS
-.Nm
-.Op Ar options
-.Ar package Op Ar package ...
+.SH SYNOPSIS
+.B u-config
+.RI [ options ]
+.I package
+.RI [ package " ...]"
 .
-.Sh DESCRIPTION
-.Nm
-is a small, highly portable pkg-config and pkgconf clone. It retrieves compiler
-and linker flags, version, and other dependency information of software
-packages.
-.Pp
+.SH DESCRIPTION
+.B u-config
+is a small, highly portable pkg-config and pkgconf clone.
+It retrieves compiler and linker flags, version, and other dependency
+information of software packages.
+.PP
 Package metadata is retrieved from
-.Dq .pc
-text files, located in a system-specific path. You can override the default
-search path with environment variables like
-.Ev PKG_CONFIG_PATH .
+.RB \(lq .pc \(rq
+text files, located in a system-specific path.
+You can override the default search path with environment variables like
+.BR PKG_CONFIG_PATH .
 See
-.Sx ENVIRONMENT
+.B ENVIRONMENT
 for more information.
-.Pp
+.PP
 This manual page describes the
-.Nm
-utility in particular. For general information about pkg-config concepts and its
-file format, refer to manual pages provided by other projects, like
-.Xr pkgconf 1
+.B u-config
+utility in particular.
+For general information about pkg-config concepts and its file format,
+refer to manual pages provided by other projects, like
+.BR pkgconf (1)
 and
-.Xr pc 5 .
-.Pp
-.Nm
-supports a subset of the options of other pkg-config implementations. For a
-list of supported options, use the
-.Fl \-help
-option. Some of them are unique to
-.Nm :
-.Bl -tag -width indent
-.It Fl \-newlines
-Separate arguments by line feeds instead of spaces, which is sometimes useful
-like in the fish shell or when manually examining output.
-.It Fl \-msvc\-syntax
-Translates and prints compiler arguments into a syntax compatible with the MSVC
-compiler. For example,
-.Fl l Ar libname
+.BR pc (5).
+.PP
+.B u-config
+supports a subset of the options of other pkg-config implementations.
+For a list of supported options, use the
+.B \-\-help
+option.
+Some of them are unique to
+.BR u-config :
+.TP
+.B \-\-newlines
+Separate arguments by line feeds instead of spaces, which is sometimes
+useful like in the fish shell or when manually examining output.
+.TP
+.B \-\-msvc\-syntax
+Translates and prints compiler arguments into a syntax compatible with the
+MSVC compiler.
+For example,
+.BI \-l " libname"
 becomes
-.Cm libname.lib .
-.El
+.BR libname.lib .
 .
-.Sh ENVIRONMENT
-.Nm
-supports all the important pkg-config run-time environment variables. To see
-which are supported, use the
-.Fl \-help
+.SH ENVIRONMENT
+.B u-config
+supports all the important pkg-config run-time environment variables.
+To see which are supported, use the
+.B \-\-help
 option.
 .
-.Sh EXAMPLES
-.Bd -literal
-$ u-config --cflags --libs foo
--I/usr/include/foo -DFOO_HAS_BAR=1 -lfoo
-.Ed
+.SH EXAMPLES
+.nf
+$ u-config \-\-cflags \-\-libs foo
+\-I/usr/include/foo \-DFOO_HAS_BAR=1 \-lfoo
+.fi
 .
-.Sh SEE ALSO
-.Xr pkgconf 1 ,
-.Xr pc 5
+.SH SEE ALSO
+.BR pkgconf (1),
+.BR pc (5)
 .
-.Sh AUTHORS
-.Nm
-was written by
-.An Chris Wellons Aq Mt wellons@nullprogram.com .
-This manual page was written by
-.An Andrea Pappacoda Aq Mt andrea@pappacoda.it
-for the Debian project
-.Pq and may be used by others .
+.SH AUTHORS
+.B u-config
+was written by Chris Wellons <wellons@nullprogram.com>.
+This manual page was written by Andrea Pappacoda <andrea@pappacoda.it>
+for the Debian project (and may be used by others).
