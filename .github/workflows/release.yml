@@ -1,0 +1,83 @@
+# On a version tag (v1.2.3, which must equal VERSION in src/u-config.c),
+# test, then publish a release titled by the version, with the tag's
+# message body as notes, and three assets: a deterministic source
+# tarball, the Windows amalgamation (pkg-config.c), and the WASI build
+# (pkg-config.wasm). Releases are immutable, so every asset goes up in
+# the one gh release create, and GitHub records each asset's SHA-256.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+# Explicitly bash, which runs steps with -e and pipefail, so that a
+# failing git archive fails its step
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # gh release create
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6.1.0
+
+      - name: Check the tag against the version
+        run: |
+          v=$(sed -n 's/^#define VERSION "\([^"]*\)"$/\1/p' src/u-config.c)
+          if [ "$GITHUB_REF_NAME" != "v$v" ]; then
+              echo "::error::tag $GITHUB_REF_NAME is not v$v (VERSION)"
+              exit 1
+          fi
+          echo "V=$v" >>"$GITHUB_ENV"
+
+      # Checkout leaves a lightweight tag, so fetch the annotated one for
+      # its message: the body, without the "Release X.Y.Z" subject or the
+      # signature, is the release notes
+      - name: Release notes from the tag
+        run: |
+          git fetch --force origin \
+              "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          git tag -l --format='%(contents:body)' "$GITHUB_REF_NAME" >notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+              echo "::error::tag $GITHUB_REF_NAME has no message body"
+              exit 1
+          fi
+
+      - name: Install wasm-ld
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lld
+
+      - name: Test
+        run: make check
+
+      # No name or time in the gzip header, and git archive sets every
+      # mtime to the commit's
+      - name: Source tarball
+        run: |
+          mkdir dist
+          git -c tar.umask=0022 archive --format=tar --prefix="u-config-$V/" \
+              "$GITHUB_SHA" | gzip -9n >"dist/u-config-$V.tar.gz"
+
+      - name: Amalgamation
+        run: |
+          make pkg-config.c
+          cp pkg-config.c dist/
+
+      - name: WebAssembly
+        run: |
+          make pkg-config.wasm
+          cp pkg-config.wasm dist/
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+              --title "$V" --notes-file notes.md dist/*
